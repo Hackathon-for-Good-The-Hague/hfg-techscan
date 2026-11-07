@@ -61,7 +61,7 @@ partners:
 review:
   # claude-cli uses your own Claude Code login. anthropic needs ANTHROPIC_API_KEY. offline only writes the requests.
   backend: claude-cli
-  model: claude-opus-5-5
+  model: claude-sonnet-4-6
   # parallel reviews; lower to 2 if you hit usage limits
   workers: 3
   # how much of each repo the model reads (characters, roughly 3 to 4 per token). If a review fails because
