@@ -39,8 +39,7 @@ class Submission:
     junction_url: str = ""
     tree_path: str = ""          # branch (and maybe path) from a /tree/... link
     source: str = ""             # which input format it came from
-    project_id: str = ""         # Junction project ID (for pushing scores back)
-    team_size: int = 0           # number of team members (from Junction)
+    team_size: int = 0           # number of team members (from Junction export)
     notes: list = field(default_factory=list)
 
     def to_dict(self):
@@ -160,7 +159,6 @@ def read_submissions(path, cfg: dict) -> list:
             status=_first(row, "status"),
             junction_url=_first(row, "projecturl"),
             source="junction" if is_junction else "csv",
-            project_id=_first(row, "project_id", "projectid", "_id"),
             team_size=int(_first(row, "team_size", "teamsize") or 0),
         )
         if parsed:
