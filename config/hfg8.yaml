@@ -85,6 +85,14 @@ scan:
   check_demo_urls: true
   github_api: true
 
+# Junction platform integration (optional). Pulls submissions and pushes tech scores.
+# Set JUNCTION_TOKEN (organizer JWT) for pull and JUNCTION_WEBHOOK_KEY for score push.
+junction:
+  # FILL IN: the event slug from your Junction dashboard URL
+  event_slug: ""
+  api_url: "https://app.hackjunction.com"
+  push_scores: false
+
 paths:
   workdir: ../work-hfg8
   output: ../out-hfg8

@@ -52,6 +52,16 @@ def cmd_preflight(cfg, args) -> int:
         err = backend.ping()
         log(("FAIL " if err else "OK   ") + ("Review engine answered" if not err else err))
         ok &= not err
+    jcfg = cfg.get("junction") or {}
+    if jcfg.get("event_slug"):
+        from .junction import JunctionClient
+        jc = JunctionClient(cfg)
+        pull_ok = not jc.problem_pull()
+        push_ok = not jc.problem_push()
+        log(f"{'OK   ' if pull_ok else 'WARN '} Junction pull: {'ready' if pull_ok else jc.problem_pull()}")
+        log(f"{'OK   ' if push_ok else 'WARN '} Junction push: {'ready' if push_ok else jc.problem_push()}")
+    else:
+        log("     Junction: not configured (optional)")
     log("Preflight " + ("passed" if ok else "found problems"))
     return 0 if ok else 1
 
@@ -101,18 +111,87 @@ def cmd_discover(cfg, args) -> int:
 def cmd_scan(cfg, args) -> int:
     from .pipeline import run_pipeline
     from .report import write_outputs
-    if not Path(args.submissions).exists():
-        raise SystemExit(f"Submissions file not found: {args.submissions}")
+    submissions = getattr(args, "submissions", "")
+    junction_mode = getattr(args, "junction", False)
+    if junction_mode and not submissions:
+        submissions = _junction_pull_csv(cfg)
+    if not submissions:
+        raise SystemExit("No submissions file. Pass -s <file> or use --junction to pull from Junction.")
+    if not Path(submissions).exists():
+        raise SystemExit(f"Submissions file not found: {submissions}")
     if args.backend:
         cfg["review"]["backend"] = args.backend
     if args.model:
         cfg["review"]["model"] = args.model
-    run_pipeline(cfg, args.submissions, only=args.only, skip_review=args.skip_review,
-                 force_review=args.force_review, deep=args.deep, workers=args.workers)
+    out = run_pipeline(cfg, submissions, only=args.only, skip_review=args.skip_review,
+                       force_review=args.force_review, deep=args.deep, workers=args.workers)
     files = write_outputs(cfg, Path(cfg["paths"]["workdir"]), Path(cfg["paths"]["output"]))
     log("Done. Open these:")
     for f in files:
         log(f"  {f}")
+    if junction_mode and cfg.get("junction", {}).get("push_scores"):
+        _junction_push_scores(cfg, out["results"])
+    return 0
+
+
+def _junction_pull_csv(cfg) -> str:
+    from .junction import JunctionClient, write_junction_csv
+    client = JunctionClient(cfg)
+    problem = client.problem_pull()
+    if problem:
+        raise SystemExit(f"Junction pull: {problem}")
+    log("Pulling submissions from Junction...")
+    projects, err = client.pull_projects()
+    if err:
+        raise SystemExit(f"Junction pull failed: {err}")
+    rows = client.projects_to_submissions(projects, cfg)
+    out_path = Path(cfg["paths"]["workdir"]) / "junction-submissions.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    write_junction_csv(out_path, rows)
+    log(f"  {len(rows)} project(s) pulled from Junction -> {out_path}")
+    return str(out_path)
+
+
+def _junction_push_scores(cfg, results: dict) -> None:
+    from .junction import JunctionClient, format_score_message
+    client = JunctionClient(cfg)
+    problem = client.problem_push()
+    if problem:
+        log(f"Junction push skipped: {problem}")
+        return
+    pushed, errors = 0, 0
+    for slug, r in results.items():
+        project_id = r.get("submission", {}).get("project_id") or ""
+        if not project_id:
+            continue
+        rv = r.get("review") or {}
+        score = rv.get("technical_score")
+        if score is None:
+            continue
+        message = format_score_message(r, cfg)
+        ok, err = client.push_score(project_id, score, 5, message,
+                                    challenge=r.get("submission", {}).get("challenge_raw", ""))
+        if ok:
+            pushed += 1
+        else:
+            errors += 1
+            log(f"  Junction push failed for {slug}: {err}")
+    log(f"Junction: pushed {pushed} score(s)" + (f", {errors} failed" if errors else ""))
+
+
+def cmd_junction_pull(cfg, args) -> int:
+    csv_path = _junction_pull_csv(cfg)
+    log(f"Submissions saved to {csv_path}")
+    log(f"Next: python -m techscan scan -c {args.config} -s {csv_path}")
+    return 0
+
+
+def cmd_junction_push(cfg, args) -> int:
+    from .report import load_results
+    _, results = load_results(Path(cfg["paths"]["workdir"]))
+    if not results:
+        raise SystemExit("No scan results found. Run 'scan' first.")
+    _junction_push_scores(cfg, results)
     return 0
 
 
@@ -142,7 +221,8 @@ def main(argv=None) -> int:
     p.add_argument("-o", "--output", default="submissions-github.csv")
 
     p = with_config(sub.add_parser("scan", help="run the full scan and write the jury outputs"))
-    p.add_argument("-s", "--submissions", required=True, help="Junction export CSV or a project,repo,challenge CSV")
+    p.add_argument("-s", "--submissions", default="", help="Junction export CSV or a project,repo,challenge CSV")
+    p.add_argument("--junction", action="store_true", help="pull submissions from Junction API instead of CSV")
     p.add_argument("--only", default="", help="comma-separated team slugs or project names")
     p.add_argument("--skip-review", action="store_true", help="only the non-AI checks")
     p.add_argument("--force-review", action="store_true", help="ignore cached reviews")
@@ -153,6 +233,9 @@ def main(argv=None) -> int:
 
     p = with_config(sub.add_parser("report", help="rebuild outputs from the last scan"))
     p.add_argument("--only", default="", help="write one pack with just these teams (e.g. the finalists)")
+
+    with_config(sub.add_parser("junction-pull", help="pull submissions from Junction API and save as CSV"))
+    with_config(sub.add_parser("junction-push", help="push tech scores from the last scan to Junction"))
 
     p = sub.add_parser("demo", help="build a fake event with planted problems")
     p.add_argument("--dir", default="demo-event")
@@ -173,7 +256,9 @@ def main(argv=None) -> int:
     except ConfigError as e:
         log(f"Config problem: {e}")
         return 2
-    return {"preflight": cmd_preflight, "discover": cmd_discover, "scan": cmd_scan, "report": cmd_report}[args.cmd](cfg, args)
+    dispatch = {"preflight": cmd_preflight, "discover": cmd_discover, "scan": cmd_scan, "report": cmd_report,
+                 "junction-pull": cmd_junction_pull, "junction-push": cmd_junction_push}
+    return dispatch[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

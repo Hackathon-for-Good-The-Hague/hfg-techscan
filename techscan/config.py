@@ -80,6 +80,11 @@ DEFAULTS = {
         "check_demo_urls": True,
         "github_api": True,
     },
+    "junction": {
+        "event_slug": "",
+        "api_url": "https://app.hackjunction.com",
+        "push_scores": False,
+    },
     "paths": {"workdir": "./work", "output": "./out"},
 }
 
