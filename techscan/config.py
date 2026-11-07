@@ -82,8 +82,11 @@ DEFAULTS = {
     },
     "junction": {
         "event_slug": "",
-        "api_url": "https://app.hackjunction.com",
+        "event_id": "",
+        "api_url": "https://www.junctionorganize.com",
         "push_scores": False,
+        "gavel_url": "",
+        "gavel_token": "",
     },
     "paths": {"workdir": "./work", "output": "./out"},
 }

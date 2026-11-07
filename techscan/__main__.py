@@ -53,13 +53,13 @@ def cmd_preflight(cfg, args) -> int:
         log(("FAIL " if err else "OK   ") + ("Review engine answered" if not err else err))
         ok &= not err
     jcfg = cfg.get("junction") or {}
-    if jcfg.get("event_slug"):
+    if jcfg.get("event_slug") or jcfg.get("event_id"):
         from .junction import JunctionClient
         jc = JunctionClient(cfg)
         pull_ok = not jc.problem_pull()
         push_ok = not jc.problem_push()
         log(f"{'OK   ' if pull_ok else 'WARN '} Junction pull: {'ready' if pull_ok else jc.problem_pull()}")
-        log(f"{'OK   ' if push_ok else 'WARN '} Junction push: {'ready' if push_ok else jc.problem_push()}")
+        log(f"{'OK   ' if push_ok else 'WARN '} Junction/Gavel push: {'ready' if push_ok else jc.problem_push()}")
     else:
         log("     Junction: not configured (optional)")
     log("Preflight " + ("passed" if ok else "found problems"))
@@ -135,20 +135,18 @@ def cmd_scan(cfg, args) -> int:
 
 
 def _junction_pull_csv(cfg) -> str:
-    from .junction import JunctionClient, write_junction_csv
+    from .junction import JunctionClient, save_projects_csv
     client = JunctionClient(cfg)
     problem = client.problem_pull()
     if problem:
         raise SystemExit(f"Junction pull: {problem}")
-    log("Pulling submissions from Junction...")
-    projects, err = client.pull_projects()
+    log("Pulling projects CSV from Junction...")
+    csv_data, err = client.pull_projects_csv()
     if err:
         raise SystemExit(f"Junction pull failed: {err}")
-    rows = client.projects_to_submissions(projects, cfg)
     out_path = Path(cfg["paths"]["workdir"]) / "junction-submissions.csv"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    write_junction_csv(out_path, rows)
-    log(f"  {len(rows)} project(s) pulled from Junction -> {out_path}")
+    count = save_projects_csv(csv_data, out_path)
+    log(f"  {count} row(s) pulled from Junction -> {out_path}")
     return str(out_path)
 
 
@@ -157,26 +155,25 @@ def _junction_push_scores(cfg, results: dict) -> None:
     client = JunctionClient(cfg)
     problem = client.problem_push()
     if problem:
-        log(f"Junction push skipped: {problem}")
+        log(f"Junction/Gavel push skipped: {problem}")
         return
     pushed, errors = 0, 0
     for slug, r in results.items():
-        project_id = r.get("submission", {}).get("project_id") or ""
-        if not project_id:
-            continue
         rv = r.get("review") or {}
         score = rv.get("technical_score")
         if score is None:
             continue
+        project_name = r.get("submission", {}).get("project", "")
+        if not project_name:
+            continue
         message = format_score_message(r, cfg)
-        ok, err = client.push_score(project_id, score, 5, message,
-                                    challenge=r.get("submission", {}).get("challenge_raw", ""))
+        ok, err = client.push_score(project_name, score, message)
         if ok:
             pushed += 1
         else:
             errors += 1
-            log(f"  Junction push failed for {slug}: {err}")
-    log(f"Junction: pushed {pushed} score(s)" + (f", {errors} failed" if errors else ""))
+            log(f"  Gavel push failed for {slug}: {err}")
+    log(f"Gavel: pushed {pushed} score(s)" + (f", {errors} failed" if errors else ""))
 
 
 def cmd_junction_pull(cfg, args) -> int:
