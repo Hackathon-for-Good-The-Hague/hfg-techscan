@@ -44,11 +44,71 @@ class JunctionClient:
         self.push_scores = jcfg.get("push_scores", False)
         self.gavel_url = (jcfg.get("gavel_url") or "").rstrip("/")
         self.gavel_token = os.environ.get("GAVEL_ADMIN_TOKEN") or jcfg.get("gavel_token", "")
-        # Clerk session token: grab from browser DevTools → Cookies → __session
+        # Clerk session token: either fresh __session cookie or long-lived __client cookie
         self.session_token = os.environ.get("JUNCTION_SESSION") or ""
+        self.client_token = os.environ.get("JUNCTION_CLIENT") or ""
+        self.clerk_domain = jcfg.get("clerk_domain") or "clerk.hackjunction.app"
+
+    def _refresh_session(self) -> bool:
+        """Use the long-lived __client JWT to get a fresh __session token via Clerk's token endpoint."""
+        if not self.client_token:
+            return False
+        # First, get the active session ID from the client endpoint
+        session_id = self._get_active_session_id()
+        if not session_id:
+            return False
+        url = f"https://{self.clerk_domain}/v1/client/sessions/{session_id}/tokens?__clerk_api_version=2025-11-10"
+        headers = {"Cookie": f"__client={self.client_token}",
+                   "Content-Type": "application/x-www-form-urlencoded",
+                   "User-Agent": "hfg-techscan"}
+        req = urllib.request.Request(url, data=b"", headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8", errors="replace"))
+                jwt = data.get("jwt") or ""
+                if jwt:
+                    self.session_token = jwt
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _get_active_session_id(self) -> str:
+        """Get the active session ID from the Clerk client endpoint."""
+        url = f"https://{self.clerk_domain}/v1/client?__clerk_api_version=2025-11-10"
+        headers = {"Cookie": f"__client={self.client_token}",
+                   "User-Agent": "hfg-techscan"}
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8", errors="replace"))
+                resp = data.get("response") or data
+                sessions = resp.get("sessions") or []
+                for s in sessions:
+                    if s.get("status") == "active":
+                        return s.get("id", "")
+                # Fall back to first session if none marked active
+                if sessions:
+                    return sessions[0].get("id", "")
+        except Exception:
+            pass
+        return ""
 
     def _trpc(self, procedures: list, inputs: list, timeout=30):
         """Call one or more tRPC queries in a batch. Returns (results_list, error)."""
+        # If no session token, try to get one from the client token first
+        if not self.session_token and self.client_token:
+            self._refresh_session()
+        for attempt in range(2):
+            result, err = self._trpc_once(procedures, inputs, timeout)
+            if err and "Authentication failed" in err and attempt == 0 and self.client_token:
+                log("  Session token expired, refreshing...")
+                if self._refresh_session():
+                    continue
+            return result, err
+        return None, "Authentication failed after refresh attempt"
+
+    def _trpc_once(self, procedures, inputs, timeout):
         names = ",".join(procedures)
         batch_input = {str(i): {"json": inp} for i, inp in enumerate(inputs)}
         qs = urllib.parse.urlencode({"batch": "1", "input": json.dumps(batch_input, separators=(",", ":"))})
@@ -56,7 +116,7 @@ class JunctionClient:
         headers = {"Accept": "*/*", "Content-Type": "application/json",
                    "User-Agent": "hfg-techscan"}
         if self.session_token:
-            headers["Cookie"] = f"__session={self.session_token}"
+            headers["Authorization"] = f"Bearer {self.session_token}"
         req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -81,10 +141,10 @@ class JunctionClient:
     def problem_pull(self) -> str:
         if not self.event_id and not self.event_slug:
             return "junction.event_id (or event_slug) is not set in the config"
-        if not self.session_token:
-            return ("JUNCTION_SESSION is not set. "
+        if not self.session_token and not self.client_token:
+            return ("JUNCTION_SESSION or JUNCTION_CLIENT is not set. "
                     "In your browser: DevTools → Application → Cookies → www.junctionorganize.com → "
-                    "copy the __session value and run: export JUNCTION_SESSION=eyJ...")
+                    "copy __client value (long-lived) and run: export JUNCTION_CLIENT=eyJ...")
         return ""
 
     def pull_projects_csv(self) -> tuple:

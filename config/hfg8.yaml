@@ -90,7 +90,7 @@ scan:
 # Push: deploy Gavel from Junction's dashboard, then set gavel_url + GAVEL_ADMIN_TOKEN.
 junction:
   event_slug: "hackathon-for-good-8"
-  # event_id: ""  # if the tRPC endpoint needs the internal ID instead of the slug
+  event_id: 20
   api_url: "https://www.junctionorganize.com"
   push_scores: true
   # gavel_url: "https://your-gavel-instance.example.com"  # from Junction → Gavel Connection
