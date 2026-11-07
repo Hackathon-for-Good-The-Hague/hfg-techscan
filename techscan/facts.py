@@ -520,12 +520,35 @@ def analyze_readme(inv: Inventory) -> dict:
         if MOCK_DISCLOSURE_RE.search(line) and len(disclosures) < 8:
             disclosures.append({"line": i, "snippet": truncate(line.strip(), 140)})
     blocks = re.findall(r"```.*?```", text, re.S)
+    has_run = bool(RUN_HINT_RE.search("\n".join(blocks))) or bool(RUN_HINT_RE.search(text) and len(text) > 400)
+    headings = re.findall(r"(?m)^#{1,3}\s+(.+)", text)
+    heading_text = " ".join(headings).lower()
+    has_arch = bool(re.search(r"(?i)(architect|stack|tech|how it works|system design|overview|components|structure)", heading_text)
+                    or re.search(r"(?i)(architect|stack|tech|how it works|system design)\b", text[:3000]))
+    has_screenshots = bool(re.search(r"!\[.*?\]\(.*?\)|<img\s|screenshot|screen shot|demo\.gif|demo\.png|preview", text, re.I))
+    has_env = bool(re.search(r"(?i)\.env|environment variable|API.?KEY|config(uration)?", text[:4000]))
+    has_license = bool(re.search(r"(?im)^#{1,3}\s+licen[sc]e|^licen[sc]e", text) or
+                       any(f["path"].lower().startswith("license") for f in inv.files))
+    quality = sum([
+        bool(text.strip()),                # exists and non-empty
+        len(text) >= 300,                   # at least a few paragraphs
+        len(headings) >= 3,                 # structured with sections
+        has_run,                            # how to run it
+        has_arch,                           # architecture or tech stack section
+        has_screenshots,                    # visual evidence
+    ])
     return {
         "exists": True,
         "path": f["path"],
         "chars": len(text),
         "status": f["status"],
-        "has_run_instructions": bool(RUN_HINT_RE.search("\n".join(blocks))) or bool(RUN_HINT_RE.search(text) and len(text) > 400),
+        "has_run_instructions": has_run,
+        "has_architecture": has_arch,
+        "has_screenshots": has_screenshots,
+        "has_env_setup": has_env,
+        "has_license": has_license,
+        "headings": len(headings),
+        "quality": quality,       # 0-6 score
         "mock_disclosures": disclosures,
     }
 
@@ -837,6 +860,9 @@ def build_flags(sub: dict, snap: dict, gh: dict, facts: dict, similar: list, org
         add("no_team_code", "high" if not subs else "medium",
             "No code beyond the template or generated scaffolding" if not subs else "No team code outside the submodules",
             "Concept-only submission, or the code lives somewhere else.")
+    if tl.get("contributors", 0) == 1 and tl.get("commits", 0) >= 5:
+        add("solo_contributor", "info", "All commits are from one person",
+            "Normal for small teams, but worth checking if the team has multiple members.")
     rd = facts["readme"]
     if not rd.get("exists"):
         add("no_readme", "low", "No README")

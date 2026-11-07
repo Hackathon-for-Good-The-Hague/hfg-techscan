@@ -142,10 +142,10 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
     ws = wb.active
     ws.title = "Scorecard"
     headers = ["Project", "Challenge", "Tech score (1-5)", "Works end to end", "Depth", "Honest claims", "Code quality",
-               "Confidence", "Claims verified", "Claims mocked or missing", "Uses challenge data", "AI approach",
-               "High flags", "All flags", "Partner tech", "Built with Lovable", "Commits", "Contributors",
+               "Confidence", "In short", "Claims verified", "Claims mocked or missing", "Uses challenge data", "AI approach",
+               "High flags", "All flags", "README", "Partner tech", "Built with Lovable", "Commits", "Contributors",
                "Team code lines", "Demo link", "Video", "Repository", "Snapshot", "Review status", "Questions for the jury"]
-    sheet(ws, headers, [30, 16, 10, 10, 8, 10, 10, 11, 11, 13, 12, 22, 8, 50, 26, 10, 9, 11, 11, 11, 8, 40, 11, 12, 70])
+    sheet(ws, headers, [30, 16, 10, 10, 8, 10, 10, 11, 50, 11, 13, 12, 22, 8, 50, 28, 26, 10, 9, 11, 11, 11, 8, 40, 11, 12, 70])
     for slug, r in _order(results, cfg):
         sub, f, rv = r["submission"], r.get("facts") or {}, r.get("review") or {}
         chal = (cfg["challenges"].get(sub.get("challenge")) or {}).get("name", sub.get("challenge_raw") or "?")
@@ -153,17 +153,20 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
         n_claims = len(rv.get("claims") or [])
         flags = _all_flags(r)
         tl = f.get("timeline") or {}
+        rd = (f or {}).get("readme") or {}
         row = [
             sub["project"], chal, rv.get("technical_score"),
             (rv.get("scores") or {}).get("completeness"), (rv.get("scores") or {}).get("depth"),
             (rv.get("scores") or {}).get("integrity"), (rv.get("scores") or {}).get("quality"),
             rv.get("confidence", ""),
+            _score_summary(r),
             f"{cs.get('verified', 0)} of {n_claims}" if n_claims else "",
             (cs.get("mocked", 0) + cs.get("missing", 0)) if n_claims else "",
             DATA_LABEL.get((rv.get("challenge_data") or {}).get("used", ""), ""),
             AI_LABEL.get((rv.get("ai_approach") or {}).get("type", ""), ""),
             sum(1 for x in flags if x["severity"] == "high"),
             "\n".join(f"[{x['severity']}] {x['title']}" for x in flags if x["severity"] != "info"),
+            _readme_quality(rd) if rd.get("exists") and rd.get("status") != "template" else ("template" if rd.get("status") == "template" else "none"),
             _partners(r),
             "Yes" if (f.get("lovable") or {}).get("lovable") else "",
             tl.get("commits", ""), tl.get("contributors", ""), f.get("team_code_lines", ""),
@@ -325,10 +328,83 @@ def _evid_html(r, items) -> str:
     return f'<div class="ev">{"".join(parts)}</div>' if parts else ""
 
 
+def _readme_quality(rd: dict) -> str:
+    """Short summary of README completeness."""
+    q = rd.get("quality", 0)
+    parts = []
+    if q >= 5:
+        parts.append("Well-documented")
+    elif q >= 3:
+        parts.append("Adequate")
+    elif q >= 1:
+        parts.append("Minimal")
+    else:
+        parts.append("Empty or missing")
+    has = []
+    if rd.get("has_run_instructions"):
+        has.append("setup instructions")
+    if rd.get("has_architecture"):
+        has.append("architecture")
+    if rd.get("has_screenshots"):
+        has.append("screenshots")
+    missing = []
+    if not rd.get("has_run_instructions"):
+        missing.append("setup instructions")
+    if not rd.get("has_architecture"):
+        missing.append("architecture")
+    if not rd.get("has_screenshots"):
+        missing.append("visuals")
+    detail = ""
+    if has:
+        detail += f" (has {', '.join(has)})"
+    if missing:
+        detail += f" — missing {', '.join(missing)}"
+    return f"{parts[0]} ({q}/6){detail}"
+
+
+def _score_summary(r: dict) -> str:
+    """One plain-language paragraph explaining what the tech score means, for non-technical judges."""
+    rv = r.get("review") or {}
+    score = rv.get("technical_score")
+    f = r.get("facts") or {}
+    tl = f.get("timeline") or {}
+    flags = [x for x in _all_flags(r, dedupe=True) if x["severity"] in ("high", "medium")]
+    lines = f.get("team_code_lines", 0)
+    contributors = tl.get("contributors", 0)
+    lov = (f.get("lovable") or {}).get("lovable", False)
+    parts = []
+    if score is None:
+        return ""
+    label = {1: "very little working code", 2: "mostly user interface or mocked functionality",
+             3: "a narrow but real working feature", 4: "a working end-to-end solution",
+             5: "an exceptionally complete solution for the time available"}.get(score, "")
+    parts.append(f"This submission has {label} (score {score}/5).")
+    if lines:
+        parts.append(f"The team wrote about {lines:,} lines of code" +
+                     (f" with {contributors} contributor(s)." if contributors else "."))
+    if lov:
+        parts.append("The project was generated with Lovable (an AI app builder); check how much the team customised beyond the scaffold.")
+    if flags:
+        high = [x for x in flags if x["severity"] == "high"]
+        if high:
+            parts.append(f"There {'is' if len(high) == 1 else 'are'} {len(high)} high-priority flag(s) to check before scoring.")
+        elif flags:
+            parts.append(f"There {'is' if len(flags) == 1 else 'are'} {len(flags)} flag(s) worth a quick look.")
+    cs = rv.get("claims_summary") or {}
+    n_claims = sum(cs.values())
+    verified = cs.get("verified", 0)
+    mocked = cs.get("mocked", 0) + cs.get("missing", 0)
+    if n_claims:
+        parts.append(f"Of {n_claims} claims checked, {verified} {'was' if verified == 1 else 'were'} verified in the code"
+                     + (f" and {mocked} {'was' if mocked == 1 else 'were'} mocked or missing" if mocked else "") + ".")
+    return " ".join(parts)
+
+
 def _team_html(r: dict, cfg: dict) -> str:
     sub, f, rv, snap = r["submission"], r.get("facts") or {}, r.get("review") or {}, r.get("snapshot") or {}
     chal = (cfg["challenges"].get(sub.get("challenge")) or {}).get("name", sub.get("challenge_raw") or "Challenge unknown")
     tl = f.get("timeline") or {}
+    rd = f.get("readme") or {}
     out = [f'<section class="team" id="{e(sub["slug"])}">']
     chips = [f'<span class="chip">{e(chal)}</span>']
     if (f.get("lovable") or {}).get("lovable"):
@@ -366,6 +442,9 @@ def _team_html(r: dict, cfg: dict) -> str:
         rows.append(f'<div class="row"><span class="lab">Confidence</span><b>{e(rv.get("confidence", ""))}</b></div>')
         subs_html = "".join(rows)
     out.append(f'<div class="top">{badge}<div class="subs">{subs_html}</div></div>')
+    tldr = _score_summary(r)
+    if tldr:
+        out.append(f'<p class="small" style="margin:6px 0 4px;color:#4b5563"><b>In short:</b> {e(tldr)}</p>')
     if rv.get("summary"):
         out.append(f'<p class="summarytxt">{e(rv["summary"])}</p>')
     elif r.get("errors"):
@@ -419,6 +498,7 @@ def _team_html(r: dict, cfg: dict) -> str:
         tr("Team-written code", e(f"{f.get('team_code_lines', 0)} lines" + (f" ({langs})" if langs else "")) if f else ""),
         tr("Notebooks", e(f"{nb.get('notebooks')} notebook(s), {nb.get('executed_cells')} of {nb.get('code_cells')} code cells run") if nb.get("notebooks") else ""),
         tr("Partner tech", e(_partners(r))),
+        tr("README quality", e(_readme_quality(rd)) if rd.get("exists") and rd.get("status") != "template" else ""),
         tr("Tests", e(f.get("tests")) if f.get("tests") else ""),
         tr("Demo link", e((f.get("demo") or {}).get("status", "")) if sub.get("demo") else ""),
         tr("Review coverage", e(f"{pack.get('files_included', 0)} file(s) read in full or in part, {pack.get('files_omitted', 0)} left out for size") if pack else ""),

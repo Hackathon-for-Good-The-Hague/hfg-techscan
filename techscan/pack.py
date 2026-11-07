@@ -143,7 +143,7 @@ def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: 
         "notebooks": facts["notebooks"],
         "notable_dependencies": facts["dependencies"]["notable"],
         "tests_found": facts["tests"],
-        "readme": {k: v for k, v in facts["readme"].items() if k != "mock_disclosures"},
+        "readme": {k: v for k, v in facts["readme"].items() if k not in ("mock_disclosures", "has_license")},
         "mock_disclosures_in_readme": facts["readme"].get("mock_disclosures", []),
         "data_files": facts["data_files"][:8],
         "challenge_data_signals": facts["challenge_data"]["found"][:10],
