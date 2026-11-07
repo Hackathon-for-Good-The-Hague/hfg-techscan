@@ -101,6 +101,8 @@ def cmd_discover(cfg, args) -> int:
 def cmd_scan(cfg, args) -> int:
     from .pipeline import run_pipeline
     from .report import write_outputs
+    if not Path(args.submissions).exists():
+        raise SystemExit(f"Submissions file not found: {args.submissions}")
     if args.backend:
         cfg["review"]["backend"] = args.backend
     if args.model:

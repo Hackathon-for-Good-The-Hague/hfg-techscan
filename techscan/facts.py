@@ -422,7 +422,7 @@ def scan_secrets(inv: Inventory, history: str) -> tuple:
                 line = line[:5000]
             scan_line(line, f["path"], i, "current files")
     commit, path = "", ""
-    for line in history.splitlines():
+    for line in (history or "").splitlines():
         if line.startswith("\x1eCOMMIT ") or line.startswith("COMMIT "):
             commit = line.split()[-1]
         elif line.startswith("+++ "):
@@ -510,7 +510,11 @@ def analyze_readme(inv: Inventory) -> dict:
     if not cands:
         return {"exists": False}
     f = sorted(cands, key=lambda x: x["path"].count("/"))[0]
-    text = inv.read(f["path"])
+    try:
+        text = inv.read(f["path"])
+    except OSError:
+        return {"exists": True, "path": f["path"], "chars": 0, "status": f["status"],
+                "has_run_instructions": False, "mock_disclosures": []}
     disclosures = []
     for i, line in enumerate(text.splitlines(), 1):
         if MOCK_DISCLOSURE_RE.search(line) and len(disclosures) < 8:

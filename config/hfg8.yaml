@@ -42,14 +42,14 @@ partners:
   maritime:
     label: "Maritime"
     patterns: ['\bfrom\s+maritime\s+import\b', '\bimport\s+maritime\b', 'api\.maritime\.sh', '\bmaritime\.sh\b',
-               'MARITIME_API_KEY', '\bmaritime\s+(deploy|agents|keys|guide)\b', '["'']maritime["'']\s*:', '@maritime[-/]',
+               'MARITIME_API_KEY', '\bmaritime\s+(deploy|agents|keys|guide)\b', '["\u0027]maritime["\u0027]\s*:', '@maritime[-/]',
                '^maritime([<>=~! ].*)?$']
   brightdata:
     label: "Bright Data"
     patterns: ['bright[\s_-]?data', 'brd\.superproxy\.io', 'brd-customer', 'api\.brightdata\.com']
   aws:
     label: "AWS"
-    patterns: ['\bboto3\b', '@aws-sdk/', '["'']aws-sdk["'']', '\.amazonaws\.com', '\baws-cdk\b', '\bbedrock-runtime\b',
+    patterns: ['\bboto3\b', '@aws-sdk/', '["\u0027]aws-sdk["\u0027]', '\.amazonaws\.com', '\baws-cdk\b', '\bbedrock-runtime\b',
                'AWS_ACCESS_KEY_ID', '\bsagemaker\b']
   greenpt:
     label: "GreenPT"

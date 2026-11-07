@@ -191,7 +191,7 @@ def validate(data, file_lines: dict, seen_files: dict) -> dict:
         st = str(c.get("status", "unclear")).lower()
         r["claims"].append({
             "claim": truncate(str(c.get("claim", "")), 300),
-            "source": str(c.get("source", "")),
+            "source": str(c.get("source", "description")) if str(c.get("source", "")).lower() in ("description", "readme", "both") else "description",
             "status": st if st in CLAIM_STATUS else "unclear",
             "evidence": ev(c.get("evidence")),
             "note": truncate(str(c.get("note", "")), 400),
@@ -216,7 +216,7 @@ def validate(data, file_lines: dict, seen_files: dict) -> dict:
                                "detail": truncate(str(f.get("detail", "")), 500), "evidence": ev(f.get("evidence"))})
     r["jury_questions"] = [truncate(str(q), 300) for q in (data.get("jury_questions") or []) if str(q).strip()][:3]
     sc = data.get("scores") or {}
-    r["scores"] = {k: _clamp(sc.get(k)) for k in ("completeness", "depth", "integrity", "quality")}
+    r["scores"] = {k: _clamp(sc.get(k), default=3) for k in ("completeness", "depth", "integrity", "quality")}
     r["technical_score"] = _clamp(data.get("technical_score"))
     conf = str(data.get("confidence", "medium")).lower()
     r["confidence"] = conf if conf in ("high", "medium", "low") else "medium"
@@ -392,7 +392,11 @@ class Offline:
             req.write_text(content, encoding="utf-8")  # only touched when the input really changed
         resp_path = self.dir / "responses" / f"{slug}.json"
         resp = read_json(resp_path)
-        if not isinstance(resp, dict) or resp_path.stat().st_mtime < req.stat().st_mtime:
+        try:
+            stale = not isinstance(resp, dict) or resp_path.stat().st_mtime < req.stat().st_mtime
+        except OSError:
+            stale = True
+        if stale:
             raise ReviewError(f"pending: request written to {req}; put the answer in responses/{slug}.json")
         return resp, {"backend": "offline", "model": "manual", "deep": deep}
 

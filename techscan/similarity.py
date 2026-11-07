@@ -124,7 +124,10 @@ def cross_repo(inventories: dict, min_repos: int, min_shared: int, min_ratio: fl
             for me, other, files, counts in ((a, b, fa, ca), (b, a, fb, cb)):
                 if not files:
                     files = [p for p, _ in counts.most_common(5)]
+                if identical:
+                    id_file = pa if me == a else pb
+                else:
+                    id_file = ""
                 similar[me].append({"other": other, "shared_lines": len(shared), "ratio": round(ratio, 2),
-                                    "files": files[:5],
-                                    "identical_file": (identical if me == a else (cb.most_common(1)[0][0] if identical else ""))})
+                                    "files": files[:5], "identical_file": id_file})
     return boilerplate, dict(similar)

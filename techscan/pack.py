@@ -83,7 +83,10 @@ def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: 
         except OSError:
             continue
         if f["kind"] == "notebook":
-            raw, _ = notebook_to_text(raw)
+            try:
+                raw, _ = notebook_to_text(raw)
+            except (ValueError, KeyError, TypeError):
+                raw = raw[:20000]  # malformed notebook: show raw content
         elif f["kind"] == "data":
             raw = "\n".join(raw.splitlines()[:12]) + "\n[... data file truncated to the first lines ...]"
         elif f["kind"] == "config" and f["size"] > 60_000:

@@ -143,14 +143,26 @@ def write_json(path: Path, data) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-    os.replace(tmp, path)
+    for attempt in range(3):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt < 2:
+                import time
+                time.sleep(0.5)
+            else:
+                raise
 
 
 def read_json(path: Path, default=None):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (OSError, ValueError):
+    except ValueError:
+        log(f"Warning: {path} exists but contains invalid JSON; using default")
+        return default
+    except OSError:
         return default
 
 

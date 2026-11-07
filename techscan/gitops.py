@@ -176,11 +176,18 @@ def extract_tree(repo: Path, sha: str, out_dir: Path, max_blob: int = 5_000_000)
     root = os.path.abspath(out_dir)
     written = 0
     for obj, path in blobs:
-        header = proc.stdout.readline().split()
-        if len(header) < 3 or header[1] != b"blob":
+        header = proc.stdout.readline()
+        if not header:
+            skipped.append(path)
+            break  # process died
+        parts = header.split()
+        if len(parts) >= 3 and parts[1] == b"blob":
+            data = proc.stdout.read(int(parts[2]))
+            proc.stdout.read(1)  # newline after each object
+        else:
+            # "<sha> missing\n" or unexpected type: no body to consume
+            skipped.append(path)
             continue
-        data = proc.stdout.read(int(header[2]))
-        proc.stdout.read(1)  # newline after each object
         target = os.path.abspath(os.path.join(root, *path.split("/")))
         if os.path.commonpath([root, target]) != root:
             skipped.append(path)

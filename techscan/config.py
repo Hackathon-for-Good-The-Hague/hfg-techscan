@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from pathlib import Path
 
 import yaml
@@ -133,10 +134,20 @@ def load_config(path) -> dict:
                 raise ConfigError(f"challenges.{key}.brief file not found: {bp}")
             ch["brief_path"] = str(bp)
 
+    for key, partner in cfg["partners"].items():
+        for pat in partner.get("patterns", []):
+            try:
+                re.compile(pat)
+            except re.error as e:
+                raise ConfigError(f"partners.{key}: invalid regex pattern {pat!r}: {e}") from e
+
     rv = cfg["review"]
     if rv["backend"] not in ("claude-cli", "anthropic", "offline"):
         raise ConfigError("review.backend must be claude-cli, anthropic or offline")
-    rv["workers"] = max(1, int(rv["workers"]))
+    try:
+        rv["workers"] = max(1, int(rv["workers"]))
+    except (TypeError, ValueError) as e:
+        raise ConfigError(f"review.workers must be a number, got {rv['workers']!r}") from e
 
     cfg["paths"]["workdir"] = str((base / cfg["paths"]["workdir"]).resolve())
     cfg["paths"]["output"] = str((base / cfg["paths"]["output"]).resolve())

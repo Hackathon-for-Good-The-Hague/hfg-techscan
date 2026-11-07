@@ -283,7 +283,8 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
         is_deep = slug in deep_set or sub["project"].lower() in deep_set
         chal, user, info, file_lines, seen = pack_for(slug, is_deep)
         r["pack"] = {k: v for k, v in info.items() if k != "included_lines"}
-        cwd = sandbox
+        cwd = sandbox / slug  # per-worker directory to avoid file collisions
+        cwd.mkdir(parents=True, exist_ok=True)
         if is_deep:
             cwd = workdir / "deep" / slug
             _sanitized_copy(Path(r["snapshot"]["dir"]), cwd)

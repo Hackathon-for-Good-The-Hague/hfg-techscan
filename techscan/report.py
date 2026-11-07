@@ -375,7 +375,7 @@ def _team_html(r: dict, cfg: dict) -> str:
     if flags:
         items = []
         for fl in flags[:8]:
-            items.append(f'<div class="flag"><span class="pill" style="background:{SEV_COLOR[fl["severity"]]}">{e(fl["severity"])}</span> '
+            items.append(f'<div class="flag"><span class="pill" style="background:{SEV_COLOR.get(fl["severity"], "#6B7280")}">{e(fl["severity"])}</span> '
                          f'<b>{e(fl["title"])}</b> <span class="small">({e(fl.get("source", ""))})</span>'
                          f'<div class="why">{e(fl.get("detail", ""))}</div>{_evid_html(r, fl.get("evidence"))}</div>')
         out.append(f'<div class="box flags"><h3>Check these first</h3>{"".join(items)}</div>')
@@ -459,7 +459,15 @@ def render_html(cfg: dict, run: dict, results: dict, title_suffix: str = "") -> 
 This is advisory evidence, not a verdict: the score covers technical execution only, and every flag can have an innocent explanation. Ask the team before you decide.</p>
 <p class="small">Tech score: 1 little working code, 2 mostly interface or mocked, 3 narrow but real, 4 works end to end, 5 exceptional for the time. Links open the exact lines on GitHub as they were at the deadline.</p></div>
 <table class="summary"><tr><th>Team</th><th>Challenge</th><th class="score">Tech score</th><th>Claims verified</th><th>High flags</th></tr>{''.join(rows)}</table>"""
-    body = "\n".join(_team_html(r, cfg) for _, r in _order(results, cfg, by_score=False))
+    parts = []
+    for _, r in _order(results, cfg, by_score=False):
+        try:
+            parts.append(_team_html(r, cfg))
+        except Exception:  # noqa: BLE001  (one corrupt result must not kill the whole pack)
+            slug = r.get("submission", {}).get("slug", "?")
+            parts.append(f'<section class="team"><h2>{e(slug)}</h2>'
+                         f'<p>Could not render this team. Check {slug}.json for errors.</p></section>')
+    body = "\n".join(parts)
     return head + body + "</div></body></html>"
 
 
@@ -495,6 +503,6 @@ def write_outputs(cfg: dict, workdir: Path, outdir: Path, only: str = "") -> lis
         write_json(outdir / "teams" / f"{slug}.json", r)
     try:  # last, so a spreadsheet problem never costs the jury packs
         written.insert(0, write_xlsx(outdir / "scorecard.xlsx", cfg, run, results))
-    except Exception as e:  # noqa: BLE001
-        log(f"Could not write scorecard.xlsx ({type(e).__name__}: {e}); the HTML packs are complete")
+    except Exception as exc:  # noqa: BLE001
+        log(f"Could not write scorecard.xlsx ({type(exc).__name__}: {exc}); the HTML packs are complete")
     return written
