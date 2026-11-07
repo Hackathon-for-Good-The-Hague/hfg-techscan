@@ -1,0 +1,90 @@
+# Hackathon for Good #8 (Regular Edition), 6-8 November 2026, The Hague Tech
+# Lines marked FILL IN or VERIFY need your input before Sunday's run.
+# Times need a UTC offset. The Netherlands is +01:00 in November.
+
+event:
+  name: "Hackathon for Good #8"
+  short_name: "HFG #8"
+  context: >-
+    Hackathon for Good connects data and AI talent with governments, NGOs and purpose-driven
+    organisations. This is the 8th Regular Edition at The Hague Tech, 6 to 8 November 2026.
+  # VERIFY: how the model should picture the available time
+  build_time: "about a day and a half of building (Friday evening, Saturday, Sunday morning; building closes at 22:00 each night)"
+  # VERIFY: kickoff time. Commits dated more than 2 hours before this get flagged.
+  start: "2026-11-06T17:00:00+01:00"
+  # FILL IN: the real submission deadline. The scan reviews the last commit before this moment.
+  deadline: "2026-11-08T10:00:00+01:00"
+  # VERIFY: the GitHub organisation that holds the team repos (used by 'discover')
+  github_org: "Hackathon-for-Good-The-Hague"
+
+challenges:
+  acaps:
+    name: "ACAPS"
+    # words that identify this challenge in Junction's challenge/track field, the template name or the repo name
+    match: ["acaps"]
+    # VERIFY: paste the URL of the official ACAPS template repo. Left empty, it is detected from GitHub
+    # ("generated from ..."), but only templates inside github_org are trusted.
+    template: ""
+    # optional: path to the brief as markdown (relative to this file). Otherwise it is read from the template repo.
+    brief: ""
+    # VERIFY: names of the ACAPS datasets/APIs teams were given, so the scan can see if they are used in code
+    data_hints: ["acaps", "api.acaps.org", "inform_severity", "inform severity", "crisisinsight"]
+  unicri:
+    name: "UNICRI: Stopping Child Abuse Before It Starts"
+    match: ["unicri", "child-abuse", "child abuse", "stopping"]
+    template: ""
+    brief: ""
+    data_hints: []
+
+# Hackerpack partners to detect in code. Patterns are regular expressions, case-insensitive.
+# Remove this whole block to use the built-in list (Maritime, Bright Data, AWS, GreenPT, Lovable).
+partners:
+  maritime:
+    label: "Maritime"
+    patterns: ['\bfrom\s+maritime\s+import\b', '\bimport\s+maritime\b', 'api\.maritime\.sh', '\bmaritime\.sh\b',
+               'MARITIME_API_KEY', '\bmaritime\s+(deploy|agents|keys|guide)\b', '["'']maritime["'']\s*:', '@maritime[-/]',
+               '^maritime([<>=~! ].*)?$']
+  brightdata:
+    label: "Bright Data"
+    patterns: ['bright[\s_-]?data', 'brd\.superproxy\.io', 'brd-customer', 'api\.brightdata\.com']
+  aws:
+    label: "AWS"
+    patterns: ['\bboto3\b', '@aws-sdk/', '["'']aws-sdk["'']', '\.amazonaws\.com', '\baws-cdk\b', '\bbedrock-runtime\b',
+               'AWS_ACCESS_KEY_ID', '\bsagemaker\b']
+  greenpt:
+    label: "GreenPT"
+    patterns: ['green[\s_-]?pt']
+  lovable:
+    label: "Lovable"
+    patterns: ['lovable-tagger', 'lovable\.dev', 'lovable\.app', 'lovableproject\.com', 'gptengineer']
+
+review:
+  # claude-cli uses your own Claude Code login. anthropic needs ANTHROPIC_API_KEY. offline only writes the requests.
+  backend: claude-cli
+  model: claude-opus-5-5
+  # parallel reviews; lower to 2 if you hit usage limits
+  workers: 3
+  # how much of each repo the model reads (characters, roughly 3 to 4 per token). If a review fails because
+  # the input is too long, the scanner retries once with half.
+  budget_chars: 400000
+  max_file_chars: 40000
+  timeout_minutes: 15
+  # set this if 'claude' is not on PATH, e.g. C:\Users\you\.local\bin\claude.exe
+  claude_path: ""
+  # optional: low / medium / high / xhigh / max (only if your Claude Code supports --effort)
+  effort: ""
+  # teams to review in agent mode (reads the repo with tools); usually the finalists
+  deep_teams: []
+
+scan:
+  pre_event_grace_hours: 2
+  big_drop_lines: 1500
+  big_drop_share: 0.4
+  similarity_min_shared_lines: 25
+  similarity_min_ratio: 0.2
+  check_demo_urls: true
+  github_api: true
+
+paths:
+  workdir: ../work-hfg8
+  output: ../out-hfg8

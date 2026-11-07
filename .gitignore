@@ -1,0 +1,7 @@
+# scan data: never commit (participant data, cloned repos, reviews)
+work*/
+out*/
+demo-event/
+*.csv
+__pycache__/
+*.pyc
