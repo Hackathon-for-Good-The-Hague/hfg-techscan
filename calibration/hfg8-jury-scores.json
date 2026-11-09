@@ -1,0 +1,98 @@
+{
+  "event": "Hackathon for Good #8",
+  "date": "2026-11-08",
+  "rubric": {
+    "concept": {"weight": 4, "max": 10, "label": "A · Concept"},
+    "prototype": {"weight": 2, "max": 10, "label": "B · Prototype"},
+    "technology": {"weight": 1.5, "max": 10, "label": "C · Tech"},
+    "potential": {"weight": 1.5, "max": 10, "label": "D · Potential"},
+    "business": {"weight": 0.5, "max": 10, "label": "E · Business"},
+    "wow": {"weight": 0.5, "max": 10, "label": "F · Wow"}
+  },
+  "formula": "A×4 + B×2 + C×1.5 + D×1.5 + E×0.5 + F×0.5 = max 100",
+  "finalists": [
+    {
+      "project": "ACAPS Community",
+      "team": "AI Sheep",
+      "challenge": "acaps",
+      "slug": "acaps-community",
+      "techscan_score": 4
+    },
+    {
+      "project": "Risk Wheel",
+      "team": "Earthworms",
+      "challenge": "acaps",
+      "slug": "risk-wheel",
+      "techscan_score": 4
+    },
+    {
+      "project": "Detour",
+      "team": "Detour",
+      "challenge": "unicri",
+      "slug": "detour",
+      "techscan_score": 4
+    },
+    {
+      "project": "Doorway",
+      "team": "Patch the Planet",
+      "challenge": "unicri",
+      "slug": "doorway",
+      "techscan_score": 5
+    },
+    {
+      "project": "Ground Truth Firefox Extension",
+      "team": "stats+",
+      "challenge": "acaps",
+      "slug": "ground-truth-firefox-extension",
+      "techscan_score": 5,
+      "notes": "Added as 5th finalist"
+    }
+  ],
+  "jury_members": [
+    {
+      "id": "jury1",
+      "name": "Anonymous Jury 1",
+      "organization": "",
+      "scores": {
+        "acaps-community":           {"concept": 6, "prototype": 7, "technology": 5, "potential": 5, "business": 3, "wow": 3, "total": 62},
+        "risk-wheel":                {"concept": 7, "prototype": 8, "technology": 7, "potential": 9, "business": 5, "wow": 6, "total": 71},
+        "detour":                    {"concept": 7, "prototype": 2, "technology": 5, "potential": 2, "business": 8, "wow": 7, "total": 70},
+        "doorway":                   {"concept": 8, "prototype": 8, "technology": 2, "potential": 7, "business": 4, "wow": 5, "total": 84},
+        "ground-truth-firefox-extension": {"concept": 9, "prototype": 9, "technology": 8, "potential": 8, "business": 6, "wow": 8, "total": 87}
+      }
+    },
+    {
+      "id": "jury2",
+      "name": "Sebastien",
+      "organization": "Deepfire",
+      "scores": {
+        "acaps-community":           {"concept": 7, "prototype": 9, "technology": 8, "potential": 10, "business": 8, "wow": 9, "total": 81.5},
+        "risk-wheel":                {"concept": 8, "prototype": 9, "technology": 8, "potential": 10, "business": 8, "wow": 10, "total": 86},
+        "detour":                    {"concept": 8, "prototype": 8, "technology": 7, "potential": 9, "business": 7, "wow": 8, "total": 79.5},
+        "doorway":                   {"concept": 10, "prototype": 8, "technology": 8, "potential": 9, "business": 7, "wow": 10, "total": 88.5},
+        "ground-truth-firefox-extension": {"concept": 9, "prototype": 10, "technology": 9, "potential": 8, "business": 8, "wow": 10, "total": 90.5}
+      }
+    },
+    {
+      "id": "jury3",
+      "name": "Anonymous Jury 3",
+      "organization": "",
+      "notes": "Sheet was rotated/harder to read, scores approximate",
+      "scores": {
+        "acaps-community":           {"concept": 7.5, "prototype": 7.5, "technology": 6.5, "potential": 7, "business": 10, "wow": 7, "total": null},
+        "risk-wheel":                {"concept": 6.5, "prototype": 6, "technology": 6.5, "potential": 6, "business": 10, "wow": 7.5, "total": null},
+        "detour":                    {"concept": 8, "prototype": 7, "technology": 7, "potential": 8, "business": 6, "wow": 8.5, "total": null},
+        "doorway":                   {"concept": 8.5, "prototype": 8, "technology": 7.5, "potential": 9, "business": 10, "wow": 9.5, "total": null},
+        "ground-truth-firefox-extension": {"concept": 8.5, "prototype": 8, "technology": 8.5, "potential": 9, "business": 10, "wow": 8.5, "total": null}
+      }
+    }
+  ],
+  "first_round_notes": {
+    "acaps-community": "Easy to use, solid demo",
+    "risk-wheel": "Thinking process, ground truthing + forecasting, these guys do both. Where do risks come from? How do you define what an expert is? Historical data",
+    "ground-truth-firefox-extension": "Demo, they thought about the experts, implemented in daily work. Very clever browser extension, brilliant pitch. Definitely see this responding to a user need",
+    "detour": "Great integration, good use of AI with Wordpress",
+    "doorway": "Very clever browser extension. Different levels of intervention for each. Good use of LLMs. ELE, good code, deployable, live. Security, hard work"
+  },
+  "winner": "ground-truth-firefox-extension"
+}

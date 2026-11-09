@@ -127,6 +127,9 @@ GENERIC_INJECTION_PATTERNS = [
     re.compile(r"(?i)\bnote to (the )?(ai|llm|model|assistant)\b"),
 ]
 HIDDEN_CHARS_RE = re.compile("[​‌‍⁠-⁤‪-‮⁦-⁩]")
+# Patterns that look like attempts to mimic the review JSON schema or inject structured output
+SCHEMA_INJECTION_RE = re.compile(r'(?i)"technical_score"\s*:\s*[45]|"status"\s*:\s*"verified"|"confidence"\s*:\s*"high"|"claims"\s*:\s*\[')
+ROLE_INJECTION_RE = re.compile(r"(?i)\b(you are|act as|pretend to be|role:\s*)(a |an )?(reviewer|judge|evaluator|assistant|system|admin)\b")
 MD_COMMENT_RE = re.compile(r"<!--(.*?)-->", re.S)
 
 RUN_HINT_RE = re.compile(r"(?i)\b(pip3? install|npm (install|i|run|start)|yarn|pnpm|bun (install|run)|python3? [\w./-]+|streamlit run|uvicorn|flask run|docker(-compose)? (run|up|build)|poetry (install|run)|uv (run|sync)|jupyter|conda (env|install)|make\b|go run|cargo run|npx )")
@@ -459,6 +462,12 @@ def scan_ai_directed(inv: Inventory) -> list:
             if any(p.search(line) for p in JUDGE_PATTERNS):
                 hits.append({"file": f["path"], "line": i, "kind": "text aimed at judges or AI reviewers",
                              "strength": "likely", "snippet": snippet})
+            elif SCHEMA_INJECTION_RE.search(line) and f["kind"] != "code":
+                hits.append({"file": f["path"], "line": i, "kind": "review schema mimicry in non-code file",
+                             "strength": "likely", "snippet": snippet})
+            elif ROLE_INJECTION_RE.search(line):
+                hits.append({"file": f["path"], "line": i, "kind": "role injection attempt",
+                             "strength": "possible", "snippet": snippet})
             elif is_doc and any(p.search(line) for p in GENERIC_INJECTION_PATTERNS):
                 hits.append({"file": f["path"], "line": i, "kind": "instruction-like text", "strength": "possible",
                              "snippet": snippet})

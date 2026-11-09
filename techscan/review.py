@@ -312,6 +312,10 @@ class ClaudeCLI:
             data = extract_json(str(payload.get("result", "")))
         if not isinstance(data, dict):
             raise ReviewError("Could not find the review JSON in Claude Code's answer")
+        if not data.get("summary") or not data.get("claims"):
+            # A valid review always has a summary and claims; if missing, the model
+            # may have been tricked into echoing injected JSON from the repo
+            raise ReviewError("Review JSON missing required fields (possible injection)")
         meta = {"backend": "claude-cli", "model": self.model, "deep": deep, "compat": self.compat,
                 "cost_usd": payload.get("total_cost_usd"), "duration_ms": payload.get("duration_ms"),
                 "turns": payload.get("num_turns")}

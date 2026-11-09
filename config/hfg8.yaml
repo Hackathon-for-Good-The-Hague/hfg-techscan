@@ -21,7 +21,7 @@ challenges:
   acaps:
     name: "ACAPS"
     # words that identify this challenge in Junction's challenge/track field, the template name or the repo name
-    match: ["acaps"]
+    match: ["acaps", "ground truth"]
     # VERIFY: paste the URL of the official ACAPS template repo. Left empty, it is detected from GitHub
     # ("generated from ..."), but only templates inside github_org are trusted.
     template: ""
@@ -31,7 +31,7 @@ challenges:
     data_hints: ["acaps", "api.acaps.org", "inform_severity", "inform severity", "crisisinsight"]
   unicri:
     name: "UNICRI: Stopping Child Abuse Before It Starts"
-    match: ["unicri", "child-abuse", "child abuse", "stopping"]
+    match: ["unicri", "child-abuse", "child abuse", "stopping", "before it starts"]
     template: ""
     brief: ""
     data_hints: []
