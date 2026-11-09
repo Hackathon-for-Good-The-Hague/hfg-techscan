@@ -33,19 +33,33 @@ Note the difference: an AI application legitimately contains prompts for its own
 - Never invent functionality. "Not found in the files reviewed" is an acceptable answer.
 - Keep every text field short and concrete. Write for non-technical judges: plain English, short sentences, explain any technical term in a few words.
 
-## Scores (integers 1 to 5)
-technical_score is your overall judgement of technical execution:
-1 = Little or no working code beyond the template or scaffolding, or the core claims are not implemented.
-2 = Mostly interface, static pages or mocked flows. Core logic is hardcoded or missing, or the product is a thin wrapper with no challenge-specific logic.
-3 = A real core flow works for a narrow case, with genuine logic or data processing. Notable gaps, shortcuts or undisclosed mocks.
-4 = A working end-to-end core using real data or a real model integration, sensible structure, most claims verified, mocks disclosed.
-5 = Exceptional for the time available: end-to-end, real challenge data, non-trivial engineering, claims verified, reproducible, careful about errors and privacy. Rare.
+## Scores (integers 1 to 10)
 
-Sub-scores on the same 1 to 5 scale:
-- completeness: does the main user flow run end to end?
-- depth: how much real, challenge-specific logic is there beyond scaffolding and API calls?
-- integrity: do the claims match the code? 5 = fully honest, 1 = core claims misrepresented.
-- quality: structure, readability, error handling and run instructions, by hackathon standards.
+Score each criterion below. The jury uses a weighted formula; your scores feed directly into it.
+Base your scores on what you can see in the code, the team's description, and the challenge brief.
+Where a criterion is outside what the code can tell you (business feasibility, wow factor), use the
+description, the README quality, the demo link and what the code itself implies. Be honest when
+you are guessing from limited information — that is what the confidence fields are for.
+
+Scoring anchors (apply to every criterion):
+1-2 = Nothing meaningful, or claims are not supported at all
+3-4 = Minimal effort or very early stage; major gaps
+5-6 = Reasonable attempt with clear gaps; works for a narrow case or demo
+7-8 = Strong for a hackathon; most of what was promised is there
+9-10 = Exceptional; would surprise a professional in this domain
+
+### Criteria
+
+{{CRITERIA}}
+
+### technical_score (overall, 1-10)
+
+Your single overall impression of technical execution, as before but on a 1-10 scale:
+1-2 = Little or no working code beyond template or scaffolding
+3-4 = Mostly interface, static pages or mocked flows
+5-6 = A real core flow works for a narrow case, with genuine logic
+7-8 = Working end-to-end with real data or model integration, most claims verified
+9-10 = Exceptional: end-to-end, real data, non-trivial engineering, reproducible, careful about errors and privacy
 
 If the submission is concept-only (no meaningful code), set concept_only to true and technical_score to 1, and explain this neutrally in the rationale. The jury judges such teams on other criteria.
 

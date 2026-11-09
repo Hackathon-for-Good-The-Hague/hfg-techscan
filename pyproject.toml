@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "hfg-techscan"
+version = "0.2.0"
+description = "Automated technical review of hackathon submissions"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "Hackathon for Good"}]
+keywords = ["hackathon", "judging", "code-review", "technical-review"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+api = ["anthropic>=0.40"]
+all = ["anthropic>=0.40"]
+
+[project.urls]
+Homepage = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan"
+Repository = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan"
+
+[project.scripts]
+techscan = "techscan.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["techscan*"]

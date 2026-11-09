@@ -69,6 +69,18 @@ DEFAULTS = {
         "effort": "",
         "deep_teams": [],
     },
+    "rubric": {
+        "criteria": {
+            "concept": {"label": "Concept", "weight": 4, "description": "Is the concept a real solution for the challenge, and more than just an idea?"},
+            "prototype": {"label": "Prototype", "weight": 2, "description": "Did the team build a prototype, and does it work?"},
+            "technology": {"label": "Technology feasibility", "weight": 1.5, "description": "Future-proof technology, including ethics, security and the legal side of AI?"},
+            "potential": {"label": "Product potential", "weight": 1.5, "description": "How innovative and clear is the product or service, and its opportunity?"},
+            "business": {"label": "Business feasibility", "weight": 0.5, "description": "How feasible and clear is the financial and business model?"},
+            "wow": {"label": "Wow factor", "weight": 0.5, "description": "Quality of the pitch and the team's ability to sell the idea."},
+        },
+        "max_score": 10,
+        "max_total": 100,
+    },
     "scan": {
         "pre_event_grace_hours": 2,
         "big_drop_lines": 1500,

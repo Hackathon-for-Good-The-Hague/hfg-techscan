@@ -1,6 +1,7 @@
 """The AI review step: one call per team, structured JSON out, evidence checked against the snapshot."""
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -18,7 +19,7 @@ EVID = {
     "required": ["file", "lines"],
     "properties": {"file": {"type": "string"}, "lines": {"type": "string"}, "note": {"type": "string"}},
 }
-SCORE = {"type": "integer", "minimum": 1, "maximum": 5}
+SCORE = {"type": "integer", "minimum": 1, "maximum": 10}
 CLAIM_STATUS = ["verified", "partial", "mocked", "missing", "unclear"]
 FLAG_TYPES = ["undisclosed_mock", "hardcoded_output", "prebuilt_code", "ai_directed_text", "secret_exposed",
               "copied_code", "broken_or_incomplete", "privacy_or_safety_risk", "claim_mismatch", "other"]
@@ -61,8 +62,7 @@ SCHEMA = {
         "responsible_ai": {"type": "string"},
         "jury_questions": {"type": "array", "items": {"type": "string"}},
         "scores": {"type": "object", "additionalProperties": False,
-                   "required": ["completeness", "depth", "integrity", "quality"],
-                   "properties": {"completeness": SCORE, "depth": SCORE, "integrity": SCORE, "quality": SCORE}},
+                   "properties": {}},  # populated dynamically from config
         "technical_score": SCORE,
         "technical_score_rationale": {"type": "string"},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
@@ -72,18 +72,43 @@ SCHEMA = {
 }
 
 
+def build_schema(cfg: dict) -> dict:
+    """Build the review JSON schema with criteria from the rubric config."""
+    criteria = (cfg.get("rubric") or {}).get("criteria") or {}
+    score_def = {"type": "integer", "minimum": 1, "maximum": (cfg.get("rubric") or {}).get("max_score", 10)}
+    schema = copy.deepcopy(SCHEMA)
+    scores_props = {}
+    for key in criteria:
+        scores_props[key] = score_def
+    schema["properties"]["scores"] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": list(criteria.keys()),
+        "properties": scores_props,
+    }
+    # Keep technical_score for backward compat but update range
+    schema["properties"]["technical_score"] = score_def
+    return schema
+
+
 class ReviewError(Exception):
     pass
 
 
 def system_prompt(cfg: dict, challenge: dict, deep: bool = False) -> str:
+    schema = build_schema(cfg)
     text = (PROMPTS_DIR / "review_system.md").read_text(encoding="utf-8")
     ev = cfg["event"]
     text = (text.replace("{{EVENT_NAME}}", ev.get("name", "a hackathon"))
                 .replace("{{EVENT_CONTEXT}}", ev.get("context", ""))
                 .replace("{{BUILD_TIME}}", ev.get("build_time", "a weekend"))
                 .replace("{{CHALLENGE_NAME}}", (challenge or {}).get("name", "see the brief"))
-                .replace("{{SCHEMA}}", json.dumps(SCHEMA, separators=(",", ":"))))
+                .replace("{{SCHEMA}}", json.dumps(schema, separators=(",", ":"))))
+    criteria = (cfg.get("rubric") or {}).get("criteria") or {}
+    criteria_text = []
+    for key, crit in criteria.items():
+        criteria_text.append(f"- **{key}** ({crit.get('label', key)}, weight ×{crit.get('weight', 1)}): {crit.get('description', '')}")
+    text = text.replace("{{CRITERIA}}", "\n".join(criteria_text))
     if deep:
         text += "\n" + (PROMPTS_DIR / "deep_mode.md").read_text(encoding="utf-8")
     return text
@@ -129,9 +154,9 @@ def extract_json(text: str):
 
 # ------------------------------------------------------------------ validation
 
-def _clamp(v, default=None):
+def _clamp(v, default=None, lo=1, hi=10):
     try:
-        return max(1, min(5, int(round(float(v)))))
+        return max(lo, min(hi, int(round(float(v)))))
     except (TypeError, ValueError):
         return default
 
@@ -216,7 +241,7 @@ def validate(data, file_lines: dict, seen_files: dict) -> dict:
                                "detail": truncate(str(f.get("detail", "")), 500), "evidence": ev(f.get("evidence"))})
     r["jury_questions"] = [truncate(str(q), 300) for q in (data.get("jury_questions") or []) if str(q).strip()][:3]
     sc = data.get("scores") or {}
-    r["scores"] = {k: _clamp(sc.get(k), default=3) for k in ("completeness", "depth", "integrity", "quality")}
+    r["scores"] = {k: _clamp(sc.get(k), default=5) for k in sc if isinstance(sc.get(k), (int, float, str))}
     r["technical_score"] = _clamp(data.get("technical_score"))
     conf = str(data.get("confidence", "medium")).lower()
     r["confidence"] = conf if conf in ("high", "medium", "low") else "medium"

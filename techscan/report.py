@@ -13,7 +13,9 @@ from .gitops import blob_url
 from .util import fmt_dt, log, parse_dt, read_json, truncate, write_json
 
 BLUE, YELLOW = "1962A1", "FCCD02"
-SCORE_FILL = {1: "F4B6B6", 2: "F9D9C4", 3: "FFF2CC", 4: "DDEFD5", 5: "B9E0A5"}
+SCORE_FILL_5 = {1: "F4B6B6", 2: "F9D9C4", 3: "FFF2CC", 4: "DDEFD5", 5: "B9E0A5"}
+SCORE_FILL_10 = {1: "F4B6B6", 2: "F4B6B6", 3: "F9D9C4", 4: "F9D9C4", 5: "FFF2CC",
+                 6: "FFF2CC", 7: "DDEFD5", 8: "DDEFD5", 9: "B9E0A5", 10: "B9E0A5"}
 STATUS_LABEL = {"verified": "Verified", "partial": "Partial", "mocked": "Mocked", "missing": "Missing", "unclear": "Unclear"}
 STATUS_COLOR = {"verified": "#2E7D32", "partial": "#B26A00", "mocked": "#C62828", "missing": "#8E1B1B", "unclear": "#6B7280"}
 SEV_COLOR = {"high": "#C62828", "medium": "#B26A00", "low": "#4B5563", "info": "#6B7280"}
@@ -141,11 +143,16 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
 
     ws = wb.active
     ws.title = "Scorecard"
-    headers = ["Project", "Challenge", "Tech score (1-5)", "Works end to end", "Depth", "Honest claims", "Code quality",
-               "Confidence", "In short", "Claims verified", "Claims mocked or missing", "Uses challenge data", "AI approach",
-               "High flags", "All flags", "README", "Partner tech", "Built with Lovable", "Commits", "Contributors",
-               "Team code lines", "Demo link", "Video", "Repository", "Snapshot", "Review status", "Questions for the jury"]
-    sheet(ws, headers, [30, 16, 10, 10, 8, 10, 10, 11, 50, 11, 13, 12, 22, 8, 50, 28, 26, 10, 9, 11, 11, 11, 8, 40, 11, 12, 70])
+    rubric = cfg.get("rubric") or {}
+    criteria = rubric.get("criteria") or {}
+    crit_headers = [f"{v.get('label', k)} (×{v.get('weight', 1)})" for k, v in criteria.items()]
+    headers = (["Project", "Challenge", "Weighted total"] + crit_headers +
+               ["Tech score", "Confidence", "In short", "Claims verified", "Claims mocked or missing",
+                "Uses challenge data", "AI approach", "High flags", "All flags", "README", "Partner tech",
+                "Built with Lovable", "Commits", "Contributors", "Team code lines", "Demo link", "Video",
+                "Repository", "Snapshot", "Review status", "Questions for the jury"])
+    crit_widths = [12] * len(criteria)
+    sheet(ws, headers, [30, 16, 12] + crit_widths + [10, 11, 50, 11, 13, 12, 22, 8, 50, 28, 26, 10, 9, 11, 11, 11, 8, 40, 11, 12, 70])
     for slug, r in _order(results, cfg):
         sub, f, rv = r["submission"], r.get("facts") or {}, r.get("review") or {}
         chal = (cfg["challenges"].get(sub.get("challenge")) or {}).get("name", sub.get("challenge_raw") or "?")
@@ -154,39 +161,50 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
         flags = _all_flags(r)
         tl = f.get("timeline") or {}
         rd = (f or {}).get("readme") or {}
-        row = [
-            sub["project"], chal, rv.get("technical_score"),
-            (rv.get("scores") or {}).get("completeness"), (rv.get("scores") or {}).get("depth"),
-            (rv.get("scores") or {}).get("integrity"), (rv.get("scores") or {}).get("quality"),
-            rv.get("confidence", ""),
-            _score_summary(r),
-            f"{cs.get('verified', 0)} of {n_claims}" if n_claims else "",
-            (cs.get("mocked", 0) + cs.get("missing", 0)) if n_claims else "",
-            DATA_LABEL.get((rv.get("challenge_data") or {}).get("used", ""), ""),
-            AI_LABEL.get((rv.get("ai_approach") or {}).get("type", ""), ""),
-            sum(1 for x in flags if x["severity"] == "high"),
-            "\n".join(f"[{x['severity']}] {x['title']}" for x in flags if x["severity"] != "info"),
-            _readme_quality(rd) if rd.get("exists") and rd.get("status") != "template" else ("template" if rd.get("status") == "template" else "none"),
-            _partners(r),
-            "Yes" if (f.get("lovable") or {}).get("lovable") else "",
-            tl.get("commits", ""), tl.get("contributors", ""), f.get("team_code_lines", ""),
-            (f.get("demo") or {}).get("status", "") if sub.get("demo") else "none",
-            "Yes" if sub.get("video") else "",
-            sub.get("repo_url", ""), (r.get("snapshot") or {}).get("short", ""),
-            r.get("review_status", r.get("status", "")),
-            "\n".join(f"{i}. {q}" for i, q in enumerate(rv.get("jury_questions") or [], 1)),
-        ]
+        scores = rv.get("scores") or {}
+        weighted = sum(scores.get(k, 0) * v.get("weight", 1) for k, v in criteria.items()) if scores else None
+        crit_scores = [scores.get(k) for k in criteria]
+        row = (
+            [sub["project"], chal, round(weighted, 1) if weighted else None] + crit_scores +
+            [rv.get("technical_score"), rv.get("confidence", ""),
+             _score_summary(r),
+             f"{cs.get('verified', 0)} of {n_claims}" if n_claims else "",
+             (cs.get("mocked", 0) + cs.get("missing", 0)) if n_claims else "",
+             DATA_LABEL.get((rv.get("challenge_data") or {}).get("used", ""), ""),
+             AI_LABEL.get((rv.get("ai_approach") or {}).get("type", ""), ""),
+             sum(1 for x in flags if x["severity"] == "high"),
+             "\n".join(f"[{x['severity']}] {x['title']}" for x in flags if x["severity"] != "info"),
+             _readme_quality(rd) if rd.get("exists") and rd.get("status") != "template" else ("template" if rd.get("status") == "template" else "none"),
+             _partners(r),
+             "Yes" if (f.get("lovable") or {}).get("lovable") else "",
+             tl.get("commits", ""), tl.get("contributors", ""), f.get("team_code_lines", ""),
+             (f.get("demo") or {}).get("status", "") if sub.get("demo") else "none",
+             "Yes" if sub.get("video") else "",
+             sub.get("repo_url", ""), (r.get("snapshot") or {}).get("short", ""),
+             r.get("review_status", r.get("status", "")),
+             "\n".join(f"{i}. {q}" for i, q in enumerate(rv.get("jury_questions") or [], 1)),
+            ]
+        )
         _append(ws, row)
         i = ws.max_row
         for c in ws[i]:
             c.alignment, c.border, c.font = wrap, border, Font(name="Calibri")
-        sc = rv.get("technical_score")
-        if sc in SCORE_FILL:
-            ws.cell(row=i, column=3).fill = PatternFill("solid", fgColor=SCORE_FILL[sc])
-            ws.cell(row=i, column=3).font = Font(name="Calibri", bold=True)
+        # Color the weighted total cell
+        if weighted:
+            bucket = max(1, min(10, round(weighted / (rubric.get("max_total", 100) / 10))))
+            if bucket in SCORE_FILL_10:
+                ws.cell(row=i, column=3).fill = PatternFill("solid", fgColor=SCORE_FILL_10[bucket])
+                ws.cell(row=i, column=3).font = Font(name="Calibri", bold=True)
+        # Color each criterion score cell
+        for ci, k in enumerate(criteria):
+            v = scores.get(k)
+            if v and v in SCORE_FILL_10:
+                ws.cell(row=i, column=4 + ci).fill = PatternFill("solid", fgColor=SCORE_FILL_10[v])
+        # Repo hyperlink (column shifts with dynamic criteria)
+        repo_col = 4 + len(criteria) + 18  # after criteria + fixed columns
         if sub.get("repo_url", "").startswith("http"):
-            ws.cell(row=i, column=22).hyperlink = sub["repo_url"]
-            ws.cell(row=i, column=22).font = Font(name="Calibri", color="0563C1", underline="single")
+            ws.cell(row=i, column=repo_col).hyperlink = sub["repo_url"]
+            ws.cell(row=i, column=repo_col).font = Font(name="Calibri", color="0563C1", underline="single")
     ws.auto_filter.ref = ws.dimensions
 
     ws2 = wb.create_sheet("Flags")
@@ -375,10 +393,17 @@ def _score_summary(r: dict) -> str:
     parts = []
     if score is None:
         return ""
-    label = {1: "very little working code", 2: "mostly user interface or mocked functionality",
-             3: "a narrow but real working feature", 4: "a working end-to-end solution",
-             5: "an exceptionally complete solution for the time available"}.get(score, "")
-    parts.append(f"This submission has {label} (score {score}/5).")
+    max_score = (r.get("_rubric") or {}).get("max_score", 10)
+    if max_score <= 5:
+        label = {1: "very little working code", 2: "mostly user interface or mocked functionality",
+                 3: "a narrow but real working feature", 4: "a working end-to-end solution",
+                 5: "an exceptionally complete solution for the time available"}.get(score, "")
+    else:
+        label = {1: "no working code", 2: "very little beyond template", 3: "minimal effort",
+                 4: "early stage with major gaps", 5: "reasonable attempt with clear gaps",
+                 6: "works for a narrow case", 7: "strong for a hackathon", 8: "most promises delivered",
+                 9: "exceptional", 10: "would surprise a professional"}.get(score, "")
+    parts.append(f"This submission scores {score}/{max_score} on technical execution ({label}).")
     if lines:
         parts.append(f"The team wrote about {lines:,} lines of code" +
                      (f" with {contributors} contributor(s)." if contributors else "."))
@@ -429,16 +454,30 @@ def _team_html(r: dict, cfg: dict) -> str:
         links.append(f'<a href="{e(sub["junction_url"])}" target="_blank" rel="noopener">Junction page</a>')
     out.append(f'<div class="links" style="margin-top:6px">{"".join(links)}</div>')
 
+    rubric = cfg.get("rubric") or {}
+    criteria = rubric.get("criteria") or {}
+    max_sc = rubric.get("max_score", 10)
+    scores = rv.get("scores") or {}
+    weighted = sum(scores.get(k, 0) * v.get("weight", 1) for k, v in criteria.items()) if scores else None
     score = rv.get("technical_score")
-    badge = (f'<div class="badge"><div class="n">{e(score)}<span style="font-size:18px">/5</span></div><div class="l">Technical score</div></div>'
-             if score else f'<div class="badge na"><div class="n">–</div><div class="l">{e(r.get("review_status") or r.get("status") or "No review")}</div></div>')
+    if weighted:
+        badge = (f'<div class="badge"><div class="n">{round(weighted)}<span style="font-size:14px">/{rubric.get("max_total", 100)}</span></div>'
+                 f'<div class="l">Weighted total</div></div>')
+    elif score:
+        badge = (f'<div class="badge"><div class="n">{e(score)}<span style="font-size:18px">/{max_sc}</span></div>'
+                 f'<div class="l">Technical score</div></div>')
+    else:
+        badge = f'<div class="badge na"><div class="n">–</div><div class="l">{e(r.get("review_status") or r.get("status") or "No review")}</div></div>'
     subs_html = ""
-    if rv.get("scores"):
-        labels = {"completeness": "Works end to end", "depth": "Depth", "integrity": "Honest claims", "quality": "Code quality"}
+    if scores and criteria:
         rows = []
-        for k, lab in labels.items():
-            v = rv["scores"].get(k) or 0
-            rows.append(f'<div class="row"><span class="lab">{lab}</span><span class="bar"><i style="width:{v * 20}%"></i></span><b>{v or "–"}</b></div>')
+        for k, crit in criteria.items():
+            v = scores.get(k) or 0
+            lab = crit.get("label", k)
+            pct = v * (100 / max_sc) if v else 0
+            rows.append(f'<div class="row"><span class="lab">{e(lab)}</span>'
+                        f'<span class="bar"><i style="width:{pct}%"></i></span>'
+                        f'<b>{v or "–"}</b><span class="small" style="margin-left:4px">×{crit.get("weight", 1)}</span></div>')
         rows.append(f'<div class="row"><span class="lab">Confidence</span><b>{e(rv.get("confidence", ""))}</b></div>')
         subs_html = "".join(rows)
     out.append(f'<div class="top">{badge}<div class="subs">{subs_html}</div></div>')
@@ -518,17 +557,22 @@ def _team_html(r: dict, cfg: dict) -> str:
 def render_html(cfg: dict, run: dict, results: dict, title_suffix: str = "") -> str:
     ev = cfg["event"]
     rows = []
+    rubric = cfg.get("rubric") or {}
+    criteria = rubric.get("criteria") or {}
+    max_total = rubric.get("max_total", 100)
     for slug, r in _order(results, cfg, by_score=False):
         sub, rv = r["submission"], r.get("review") or {}
         chal = (cfg["challenges"].get(sub.get("challenge")) or {}).get("name", "?")
         cs = rv.get("claims_summary") or {}
         n = len(rv.get("claims") or [])
         high = [x for x in _all_flags(r, dedupe=True) if x["severity"] == "high"]
-        score = rv.get("technical_score")
+        scores = rv.get("scores") or {}
+        weighted = sum(scores.get(k, 0) * v.get("weight", 1) for k, v in criteria.items()) if scores and criteria else None
+        score_display = f"{round(weighted)}/{max_total}" if weighted else (str(rv.get("technical_score", "–")))
         verified = "{} of {}".format(cs.get("verified", 0), n) if n else ""
         high_html = "".join("<div>" + e(x["title"]) + "</div>" for x in high[:3])
         rows.append(f'<tr><td><a href="#{e(sub["slug"])}">{e(sub["project"])}</a></td><td>{e(chal)}</td>'
-                    f'<td class="score"><b>{e(score) if score else "–"}</b></td>'
+                    f'<td class="score"><b>{e(score_display)}</b></td>'
                     f'<td>{e(verified)}</td><td>{high_html}</td></tr>')
     deadline = _local(cfg, run.get("deadline", ""))
     head = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -537,8 +581,8 @@ def render_html(cfg: dict, run: dict, results: dict, title_suffix: str = "") -> 
 <p>Code frozen at the deadline ({e(deadline)}). Generated {e(_local(cfg, run.get('finished', '')))}.</p></div></div>
 <div class="wrap"><div class="howto"><p><b>How to use this.</b> Each team's page shows what their code really does, which claims hold up, and three questions to ask.
 This is advisory evidence, not a verdict: the score covers technical execution only, and every flag can have an innocent explanation. Ask the team before you decide.</p>
-<p class="small">Tech score: 1 little working code, 2 mostly interface or mocked, 3 narrow but real, 4 works end to end, 5 exceptional for the time. Links open the exact lines on GitHub as they were at the deadline.</p></div>
-<table class="summary"><tr><th>Team</th><th>Challenge</th><th class="score">Tech score</th><th>Claims verified</th><th>High flags</th></tr>{''.join(rows)}</table>"""
+<p class="small">Scores are 1-10 per criterion, weighted to a total out of {e(str(max_total))}. Links open the exact lines on GitHub as they were at the deadline.</p></div>
+<table class="summary"><tr><th>Team</th><th>Challenge</th><th class="score">Score</th><th>Claims verified</th><th>High flags</th></tr>{''.join(rows)}</table>"""
     parts = []
     for _, r in _order(results, cfg, by_score=False):
         try:
