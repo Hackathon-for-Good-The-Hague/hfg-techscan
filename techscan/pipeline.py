@@ -352,10 +352,16 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
         except Exception as e:  # noqa: BLE001
             log(f"Could not generate narratives: {e}")
 
+    # Cost summary
+    total_cost = sum((r.get("review_meta") or {}).get("cost_usd") or 0 for r in results.values())
+    if total_cost:
+        log(f"Total review cost: ${total_cost:.2f} USD ({len(to_review)} team(s) reviewed)")
+
     run_info = {
         "event": ev["name"], "started": started.isoformat(), "finished": utcnow().isoformat(),
         "deadline": ev["deadline_dt"].isoformat(), "event_start": ev["start_dt"].isoformat(),
         "backend": "skipped" if backend is None else rv["backend"], "model": rv["model"],
+        "total_cost_usd": round(total_cost, 4) if total_cost else None,
         "github_api": gh.disabled_reason or ("on" if gh.enabled else "off"),
         "push_log_checked": "{} of {} GitHub repos".format(
             sum(1 for r in results.values() if r["github"].get("activity")),

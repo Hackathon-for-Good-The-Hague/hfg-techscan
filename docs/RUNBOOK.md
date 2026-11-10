@@ -1,18 +1,20 @@
-# Running TechScan for HFG (without Martin)
+# Running TechScan for HFG (without the developer)
 
 This is the step-by-step guide for running the technical scan at a Hackathon for Good event. You don't need to understand the code — just follow these steps.
+
+> **Security note:** Run the scheduled scan workflow from a **private** repo (not the public hfg-techscan repo). Scan results contain team scores and jury packs that should not be publicly downloadable. Create a private repo that references the public Action, or fork hfg-techscan as a private repo for your event.
 
 ## Before the event (1 hour, one-time setup)
 
 ### 1. Edit the config
 
-Copy `config/hfg8.yaml` to `config/hfg9.yaml` (or whatever edition). Edit:
+Copy `config/hfg8.yaml` to your event's config. Edit:
 
 ```yaml
 event:
-  name: "Hackathon for Good #9"
-  start: "2027-05-14T17:00:00+02:00"    # Friday kickoff time + UTC offset
-  deadline: "2027-05-16T10:00:00+02:00"  # Sunday submission deadline
+  name: "Your Hackathon Name"
+  start: "2027-11-05T17:00:00+01:00"    # Friday kickoff time + UTC offset
+  deadline: "2027-11-07T10:00:00+01:00"  # Sunday submission deadline
 
 challenges:
   challenge1:
@@ -27,7 +29,7 @@ In the repo Settings → Secrets and variables → Actions, add:
 
 | Secret | What | Where to get it |
 |--------|------|-----------------|
-| `JUNCTION_CLIENT` | Clerk `__client` cookie | Browser DevTools → Cookies → `.clerk.hackjunction.app` |
+| `JUNCTION_CLIENT` | Clerk `__client` cookie (⚠ gives full organizer access — use a dedicated account if possible) | Browser DevTools → Cookies → `.clerk.hackjunction.app` |
 | `SCAN_GITHUB_TOKEN` | GitHub PAT with `public_repo` scope | github.com/settings/tokens |
 | `ANTHROPIC_API_KEY` | Anthropic API key | console.anthropic.com |
 | `SMTP_HOST` | Email server (e.g. `smtp.gmail.com`) | Your email provider |

@@ -60,7 +60,7 @@ DEFAULTS = {
     },
     "review": {
         "backend": "claude-cli",  # claude-cli | anthropic | offline
-        "model": "claude-opus-5-5",
+        "model": "claude-sonnet-4-6",
         "workers": 3,
         "budget_chars": 400000,
         "max_file_chars": 40000,
@@ -70,6 +70,7 @@ DEFAULTS = {
         "deep_teams": [],
     },
     "rubric": {
+        "show_scores_to_jury": False,  # when False, jury packs show evidence/claims/flags but not AI scores
         "criteria": {
             "concept": {"label": "Concept", "weight": 4, "description": "Is the concept a real solution for the challenge, and more than just an idea?"},
             "prototype": {"label": "Prototype", "weight": 2, "description": "Did the team build a prototype, and does it work?"},

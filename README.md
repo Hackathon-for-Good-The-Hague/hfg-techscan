@@ -23,7 +23,7 @@
 
 ---
 
-> **Battle-tested at [Hackathon for Good #8](https://hackathonforgood.org):** 16 teams, 216,000 lines of code, 14 AI reviews completed in 19 minutes. The grand jury used the output alongside their own scoring. The scanner correctly identified the winner.
+> **Battle-tested at [Hackathon for Good #8](https://hackathonforgood.org):** 16 teams, 216,000 lines of code, 14 AI reviews completed in 19 minutes. The grand jury used the output alongside their own scoring.
 
 ---
 
@@ -163,7 +163,7 @@ rubric:
   max_total: 100
 ```
 
-Or use a community rubric: `rubrics/mlh-default.yaml`, `rubrics/school-simple.yaml`
+Or copy one of the example configs and adapt it to your event.
 
 ### Operator runbook
 
@@ -195,7 +195,7 @@ Existing adapters: Junction, DevPost, CSV (any platform).
 
 ### Share a rubric
 
-Drop a YAML in `rubrics/` with your hackathon's scoring criteria. See `config/hfg8.yaml` for the format.
+Add a YAML config with your hackathon's scoring criteria. See `config/hfg8.yaml` for the format.
 
 ### Add a deterministic check
 

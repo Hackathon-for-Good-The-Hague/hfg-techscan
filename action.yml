@@ -67,7 +67,7 @@ runs:
       env:
         JUNCTION_CLIENT: ${{ inputs.junction-client }}
       run: |
-        cd ${{ github.action_path }}
+        export PYTHONPATH="${{ github.action_path }}:$PYTHONPATH"
         python -m techscan junction-pull -c "${{ inputs.config }}"
 
     - name: Run scan
@@ -77,7 +77,7 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
       run: |
-        cd ${{ github.action_path }}
+        export PYTHONPATH="${{ github.action_path }}:$PYTHONPATH"
         SUBS="${{ inputs.submissions }}"
         if [ -z "$SUBS" ]; then
           SUBS=$(find work-* -name "junction-submissions.csv" 2>/dev/null | head -1)

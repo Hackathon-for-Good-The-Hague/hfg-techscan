@@ -87,12 +87,6 @@
       }
     }
   ],
-  "first_round_notes": {
-    "acaps-community": "Easy to use, solid demo",
-    "risk-wheel": "Thinking process, ground truthing + forecasting, these guys do both. Where do risks come from? How do you define what an expert is? Historical data",
-    "ground-truth-firefox-extension": "Demo, they thought about the experts, implemented in daily work. Very clever browser extension, brilliant pitch. Definitely see this responding to a user need",
-    "detour": "Great integration, good use of AI with Wordpress",
-    "doorway": "Very clever browser extension. Different levels of intervention for each. Good use of LLMs. ELE, good code, deployable, live. Security, hard work"
-  },
+  "notes": "Jury notes removed — require consent before publishing. Contact the event organizer for access.",
   "winner": "ground-truth-firefox-extension"
 }

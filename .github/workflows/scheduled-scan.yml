@@ -1,18 +1,19 @@
 name: Scheduled Scan
 
-# Runs every 5 minutes during event day, checks if deadline has passed, scans once.
-# Also triggerable manually for testing or re-runs.
+# Manual trigger only. Enable the schedule line during event weekend.
+# IMPORTANT: run this from a PRIVATE repo that references the public Action,
+# so scan results (team scores, jury packs) are not publicly downloadable.
 on:
   # schedule:
   #   - cron: "*/5 * * * *"  # enable during event weekend
   workflow_dispatch:
     inputs:
       submissions:
-        description: "Path to submissions CSV (leave empty to pull from Junction)"
+        description: "Path to submissions CSV (leave empty to pull from platform)"
         required: false
         default: ""
       force:
-        description: "Force re-run even if lockfile exists"
+        description: "Force re-run even if already completed"
         required: false
         default: "false"
 
@@ -37,51 +38,60 @@ jobs:
         id: gate
         run: |
           python -c "
-          import yaml, sys
-          from datetime import datetime, timezone
+          import yaml, sys, os
+          from datetime import datetime, timezone, timedelta
 
           with open('${{ env.CONFIG }}') as f:
               cfg = yaml.safe_load(f)
           deadline = cfg['event']['deadline']
-          # Parse ISO 8601 with offset
           dt = datetime.fromisoformat(deadline)
           now = datetime.now(timezone.utc)
-          grace = dt.astimezone(timezone.utc) + __import__('datetime').timedelta(minutes=30)
+          grace = dt.astimezone(timezone.utc) + timedelta(minutes=30)
 
           if now < grace and '${{ inputs.force }}' != 'true':
               print(f'Too early: deadline {deadline} + 30min grace not reached yet')
-              print('run=false')
-              with open('$GITHUB_OUTPUT' if '$GITHUB_OUTPUT' else '/dev/null', 'a') as out:
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as out:
                   out.write('run=false\n')
               sys.exit(0)
 
           print(f'Deadline passed, scan should run')
-          with open(__import__('os').environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as out:
+          with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as out:
               out.write('run=true\n')
           "
 
-      - name: Check lockfile
+      - name: Check lockfile (prevent duplicate runs)
         if: steps.gate.outputs.run == 'true'
         id: lock
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Use a branch-based lockfile via git notes or a simple artifact check
           if [ "${{ inputs.force }}" = "true" ]; then
             echo "locked=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # Check if a successful scan artifact already exists for this config
+          EXISTING=$(gh api repos/${{ github.repository }}/actions/artifacts \
+            --jq '[.artifacts[] | select(.name | startswith("techscan-results-")) | select(.expired == false)] | length' 2>/dev/null || echo "0")
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "Scan already completed ($EXISTING artifact(s) exist). Use force=true to re-run."
+            echo "locked=true" >> $GITHUB_OUTPUT
           else
-            # Check if scan results already exist in artifacts
             echo "locked=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Pull from Junction
+      - name: Pull from platform
         if: steps.gate.outputs.run == 'true' && steps.lock.outputs.locked != 'true' && inputs.submissions == ''
         env:
           JUNCTION_CLIENT: ${{ secrets.JUNCTION_CLIENT }}
+          BUILDERBASE_API_KEY: ${{ secrets.BUILDERBASE_API_KEY }}
         run: |
           if [ -n "$JUNCTION_CLIENT" ]; then
             python -m techscan junction-pull -c ${{ env.CONFIG }}
+          elif [ -n "$BUILDERBASE_API_KEY" ]; then
+            echo "BuilderBase pull not yet implemented"
+            exit 1
           else
-            echo "JUNCTION_CLIENT not set, skipping Junction pull"
-            echo "Provide a submissions CSV via workflow_dispatch or set the secret"
+            echo "No platform credentials set. Provide a submissions CSV or set JUNCTION_CLIENT / BUILDERBASE_API_KEY."
             exit 1
           fi
 
@@ -93,7 +103,7 @@ jobs:
         run: |
           SUBS="${{ inputs.submissions }}"
           if [ -z "$SUBS" ]; then
-            SUBS=$(find work-* -name "junction-submissions.csv" 2>/dev/null | head -1)
+            SUBS=$(find work-* -name "junction-submissions.csv" -o -name "builderbase-submissions.csv" 2>/dev/null | head -1)
           fi
           if [ -z "$SUBS" ]; then
             echo "No submissions file found"
@@ -101,27 +111,7 @@ jobs:
           fi
           python -m techscan scan -c ${{ env.CONFIG }} -s "$SUBS" --backend anthropic
 
-      - name: Generate per-team PDFs
-        if: steps.gate.outputs.run == 'true' && steps.lock.outputs.locked != 'true'
-        run: |
-          # Generate per-team HTML files
-          python -c "
-          import sys; sys.path.insert(0, '.')
-          from pathlib import Path
-          from techscan.config import load_config
-          from techscan.report import load_results, render_html
-
-          cfg = load_config('${{ env.CONFIG }}')
-          run, results = load_results(Path(cfg['paths']['workdir']))
-          out_dir = Path(cfg['paths']['output']) / 'teams'
-          out_dir.mkdir(parents=True, exist_ok=True)
-          for slug, r in results.items():
-              html = render_html(cfg, run, {slug: r}, f' · {r.get(\"submission\", {}).get(\"project\", slug)}')
-              (out_dir / f'{slug}.html').write_text(html, encoding='utf-8')
-          print(f'{len(results)} per-team HTML files written')
-          "
-
-      - name: Upload scan results
+      - name: Upload scan results (private artifact)
         if: steps.gate.outputs.run == 'true' && steps.lock.outputs.locked != 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -129,10 +119,14 @@ jobs:
           path: |
             out-*/scorecard.xlsx
             out-*/jury-pack-*.html
-            out-*/teams/*.html
-          retention-days: 90
+            out-*/challenge-report-*.html
+          retention-days: 30
 
-      - name: Send email notification
+      # Email and Discord are opt-in via secrets. Discord posts to a STAFF
+      # channel only (no public scores). Team reports go via email to organizers
+      # who distribute them after review.
+
+      - name: Notify staff (email)
         if: steps.gate.outputs.run == 'true' && steps.lock.outputs.locked != 'true'
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -141,7 +135,7 @@ jobs:
           NOTIFY_EMAILS: ${{ vars.NOTIFY_EMAILS }}
         run: |
           if [ -z "$SMTP_HOST" ] || [ -z "$NOTIFY_EMAILS" ]; then
-            echo "Email not configured (set SMTP_HOST secret and NOTIFY_EMAILS variable)"
+            echo "Email not configured (optional: set SMTP_HOST secret and NOTIFY_EMAILS variable)"
             exit 0
           fi
           python -c "
@@ -156,27 +150,18 @@ jobs:
           cfg = load_config('${{ env.CONFIG }}')
           out = Path(cfg['paths']['output'])
 
-          # Create ZIP of results
           zip_path = out / 'techscan-results.zip'
           with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
               for f in out.glob('*.html'):
                   zf.write(f, f.name)
               for f in out.glob('*.xlsx'):
                   zf.write(f, f.name)
-              for f in (out / 'teams').glob('*.html'):
-                  zf.write(f, f'teams/{f.name}')
 
           msg = MIMEMultipart()
-          msg['Subject'] = f'{cfg[\"event\"][\"name\"]} — Technical Scan Results'
+          msg['Subject'] = f'{cfg[\"event\"][\"name\"]} — Technical Scan Complete (staff only)'
           msg['From'] = os.environ['SMTP_USER']
           msg['To'] = os.environ['NOTIFY_EMAILS']
-
-          body = f'''The technical scan for {cfg['event']['name']} has completed.
-
-          Attached: scorecard, jury packs (HTML), and per-team reports.
-          Open the HTML files in any browser.
-
-          This is an automated message from HFG TechScan.'''
+          body = f'The technical scan for {cfg[\"event\"][\"name\"]} has completed.\n\nAttached: scorecard and jury packs. Review before sharing with juries.\n\nThis is a staff notification from HFG TechScan.'
           msg.attach(MIMEText(body, 'plain'))
 
           with open(zip_path, 'rb') as f:
@@ -190,16 +175,16 @@ jobs:
               s.starttls()
               s.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS'])
               s.send_message(msg)
-          print(f'Results emailed to {os.environ[\"NOTIFY_EMAILS\"]}')
+          print(f'Staff notified: {os.environ[\"NOTIFY_EMAILS\"]}')
           "
 
-      - name: Post to Discord
+      - name: Notify staff (Discord)
         if: steps.gate.outputs.run == 'true' && steps.lock.outputs.locked != 'true'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           if [ -z "$DISCORD_WEBHOOK" ]; then
-            echo "Discord not configured (set DISCORD_WEBHOOK secret)"
+            echo "Discord not configured (optional: set DISCORD_WEBHOOK secret for staff channel)"
             exit 0
           fi
           python -c "
@@ -212,16 +197,19 @@ jobs:
           cfg = load_config('${{ env.CONFIG }}')
           run, results = load_results(Path(cfg['paths']['workdir']))
 
-          lines = [f'**{cfg[\"event\"][\"name\"]} — Tech Scan Complete**', f'{len(results)} teams scanned.', '']
-          for slug, r in sorted(results.items(), key=lambda x: -(x[1].get(\"review\") or {}).get(\"technical_score\", 0)):
-              rv = r.get('review') or {}
-              score = rv.get('technical_score', '-')
-              name = r.get('submission', {}).get('project', slug)
-              lines.append(f'**{name}**: {score}/5')
+          # Staff-only summary: team count + completion status, NO individual scores
+          reviewed = sum(1 for r in results.values() if r.get('review'))
+          total = len(results)
+          lines = [
+              f'**{cfg[\"event\"][\"name\"]} — Tech Scan Complete** (staff only)',
+              f'{total} teams processed, {reviewed} reviewed.',
+              'Download results from the GitHub Actions artifacts page.',
+              'Review before sharing with juries and participants.',
+          ]
 
-          body = json.dumps({'content': chr(10).join(lines)[:2000]}).encode('utf-8')
+          body = json.dumps({'content': chr(10).join(lines)}).encode('utf-8')
           req = urllib.request.Request(os.environ['DISCORD_WEBHOOK'], data=body,
                                        headers={'Content-Type': 'application/json'})
           urllib.request.urlopen(req, timeout=15)
-          print('Posted to Discord')
+          print('Staff notified via Discord')
           "
