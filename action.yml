@@ -1,0 +1,109 @@
+name: "HFG TechScan"
+description: "Automated technical review of hackathon submissions. Scans code repos, verifies claims, and produces jury-ready reports."
+author: "Hackathon for Good"
+
+branding:
+  icon: "search"
+  color: "blue"
+
+inputs:
+  config:
+    description: "Path to the edition config YAML"
+    required: true
+    default: "config/hfg8.yaml"
+  submissions:
+    description: "Path to submissions CSV (leave empty to pull from Junction)"
+    required: false
+    default: ""
+  github-token:
+    description: "GitHub token for API access (recommended for push-log accuracy)"
+    required: false
+    default: ""
+  anthropic-api-key:
+    description: "Anthropic API key for AI reviews (uses API backend)"
+    required: false
+    default: ""
+  junction-client:
+    description: "Junction __client cookie for pulling submissions"
+    required: false
+    default: ""
+  skip-review:
+    description: "Skip AI review (deterministic checks only)"
+    required: false
+    default: "false"
+  model:
+    description: "Model to use for reviews (default from config)"
+    required: false
+    default: ""
+
+outputs:
+  scorecard:
+    description: "Path to the scorecard XLSX"
+    value: ${{ steps.scan.outputs.scorecard }}
+  jury-pack:
+    description: "Path to the all-teams jury pack HTML"
+    value: ${{ steps.scan.outputs.jury-pack }}
+  results-dir:
+    description: "Directory containing all output files"
+    value: ${{ steps.scan.outputs.results-dir }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install TechScan
+      shell: bash
+      run: |
+        pip install pyyaml openpyxl anthropic
+        echo "Installed dependencies"
+
+    - name: Pull from Junction
+      if: inputs.submissions == '' && inputs.junction-client != ''
+      shell: bash
+      env:
+        JUNCTION_CLIENT: ${{ inputs.junction-client }}
+      run: |
+        cd ${{ github.action_path }}
+        python -m techscan junction-pull -c "${{ inputs.config }}"
+
+    - name: Run scan
+      id: scan
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+      run: |
+        cd ${{ github.action_path }}
+        SUBS="${{ inputs.submissions }}"
+        if [ -z "$SUBS" ]; then
+          SUBS=$(find work-* -name "junction-submissions.csv" 2>/dev/null | head -1)
+        fi
+        if [ -z "$SUBS" ]; then
+          echo "::error::No submissions file. Provide 'submissions' input or set 'junction-client'."
+          exit 1
+        fi
+        EXTRA=""
+        if [ "${{ inputs.skip-review }}" = "true" ]; then
+          EXTRA="--skip-review"
+        fi
+        if [ -n "${{ inputs.model }}" ]; then
+          EXTRA="$EXTRA --model ${{ inputs.model }}"
+        fi
+        if [ -n "$ANTHROPIC_API_KEY" ]; then
+          EXTRA="$EXTRA --backend anthropic"
+        fi
+        python -m techscan scan -c "${{ inputs.config }}" -s "$SUBS" $EXTRA
+        # Find output dir from config
+        OUT_DIR=$(python -c "
+        import yaml
+        with open('${{ inputs.config }}') as f:
+            cfg = yaml.safe_load(f)
+        print(cfg.get('paths', {}).get('output', 'out'))
+        ")
+        echo "scorecard=$OUT_DIR/scorecard.xlsx" >> $GITHUB_OUTPUT
+        echo "jury-pack=$OUT_DIR/jury-pack-all.html" >> $GITHUB_OUTPUT
+        echo "results-dir=$OUT_DIR" >> $GITHUB_OUTPUT

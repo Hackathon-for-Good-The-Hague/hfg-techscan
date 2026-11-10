@@ -547,6 +547,10 @@ def _team_html(r: dict, cfg: dict) -> str:
     ]
     if any(rows):
         out.append(f'<h3 class="sec">Facts from the repository</h3><table class="facts">{"".join(rows)}</table>')
+    narrative = r.get("narrative")
+    if narrative:
+        out.append(f'<div class="box" style="background:#f0f7ff;border:1px solid #c3dafe"><h3>Building journey</h3>'
+                   f'<p style="white-space:pre-line">{e(narrative)}</p></div>')
     if rv.get("technical_score_rationale"):
         out.append(f'<p class="small"><b>Why this score:</b> {e(rv["technical_score_rationale"])}'
                    + (f' <b>Confidence note:</b> {e(rv["confidence_note"])}' if rv.get("confidence_note") else "") + "</p>")

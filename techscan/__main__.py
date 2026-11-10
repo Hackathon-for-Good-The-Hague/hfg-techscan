@@ -153,6 +153,64 @@ def cmd_junction_pull(cfg, args) -> int:
     return 0
 
 
+def cmd_observe(cfg, args) -> int:
+    from .intake import read_submissions
+    from .observe import RepoPoller
+    import os
+    subs = read_submissions(args.submissions, cfg)
+    repos = [{"slug": s.slug, "owner": s.owner, "repo": s.repo} for s in subs if s.owner and s.repo]
+    if not repos:
+        raise SystemExit("No GitHub repos found in the submissions file.")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    poller = RepoPoller(repos, token=token, interval=args.interval,
+                        output_dir=Path(cfg["paths"]["workdir"]) / "observatory")
+    log(f"Observing {len(repos)} repos every {args.interval}s" + (f" for {args.duration}s" if args.duration else " (Ctrl+C to stop)"))
+    if args.duration:
+        poller.run(args.duration)
+    else:
+        try:
+            poller.run(999999)
+        except KeyboardInterrupt:
+            log("Stopped.")
+    return 0
+
+
+def cmd_narratives(cfg, args) -> int:
+    from .observe import generate_narrative
+    obs_dir = Path(cfg["paths"]["workdir"]) / "observatory"
+    if not obs_dir.exists():
+        raise SystemExit("No observatory data found. Run 'observe' first.")
+    narratives = generate_narrative(obs_dir)
+    if not narratives:
+        raise SystemExit("No timeline data to generate narratives from.")
+    for slug, text in narratives.items():
+        log(f"\n{'=' * 60}\n{slug}\n{'=' * 60}")
+        log(text)
+    # Also save to JSON
+    from .util import write_json
+    write_json(Path(cfg["paths"]["output"]) / "narratives.json", narratives)
+    log(f"\nNarratives saved to {cfg['paths']['output']}/narratives.json")
+    return 0
+
+
+def cmd_challenge_report(cfg, args) -> int:
+    from .observe import challenge_owner_report
+    from .report import load_results
+    workdir = Path(cfg["paths"]["workdir"])
+    _, results = load_results(workdir)
+    if not results:
+        raise SystemExit("No scan results found. Run 'scan' first.")
+    for key, ch in cfg["challenges"].items():
+        subset = {s: r for s, r in results.items() if r["submission"].get("challenge") == key}
+        if not subset:
+            continue
+        html = challenge_owner_report(subset, cfg, key)
+        out = Path(cfg["paths"]["output"]) / f"challenge-report-{key}.html"
+        out.write_text(html, encoding="utf-8")
+        log(f"  {out}")
+    return 0
+
+
 def cmd_report(cfg, args) -> int:
     from .report import write_outputs
     files = write_outputs(cfg, Path(cfg["paths"]["workdir"]), Path(cfg["paths"]["output"]), only=args.only)
@@ -194,6 +252,16 @@ def main(argv=None) -> int:
 
     with_config(sub.add_parser("junction-pull", help="pull submissions from Junction API and save as CSV"))
 
+    p = with_config(sub.add_parser("observe", help="poll team repos during the event and record timelines"))
+    p.add_argument("-s", "--submissions", required=True, help="submissions CSV (needs repo URLs)")
+    p.add_argument("--interval", type=int, default=300, help="seconds between polls (default 300)")
+    p.add_argument("--duration", type=int, default=0, help="total seconds to run (0 = until Ctrl+C)")
+
+    p = with_config(sub.add_parser("narratives", help="generate building journey narratives from observatory data"))
+    p.add_argument("-s", "--submissions", default="", help="submissions CSV (optional, for team names)")
+
+    p = with_config(sub.add_parser("challenge-report", help="generate scouting report for challenge owners"))
+
     p = sub.add_parser("demo", help="build a fake event with planted problems")
     p.add_argument("--dir", default="demo-event")
 
@@ -214,7 +282,8 @@ def main(argv=None) -> int:
         log(f"Config problem: {e}")
         return 2
     dispatch = {"preflight": cmd_preflight, "discover": cmd_discover, "scan": cmd_scan, "report": cmd_report,
-                 "junction-pull": cmd_junction_pull}
+                 "junction-pull": cmd_junction_pull, "observe": cmd_observe, "narratives": cmd_narratives,
+                 "challenge-report": cmd_challenge_report}
     return dispatch[args.cmd](cfg, args)
 
 
