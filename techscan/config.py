@@ -98,6 +98,10 @@ DEFAULTS = {
         "event_id": "",
         "api_url": "https://www.junctionorganize.com",
     },
+    "builderbase": {
+        "event_id": "",
+        "api_url": "https://api.builderbase.com",
+    },
     "paths": {"workdir": "./work", "output": "./out"},
 }
 
