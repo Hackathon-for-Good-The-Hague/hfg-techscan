@@ -429,18 +429,18 @@ def cross_team_analysis(scan_results: dict) -> dict[str, object]:
     deployed = []
     for slug, r in scan_results.items():
         facts = r.get("facts") or {}
-        review = r.get("review") or {}
-        demo = (review.get("demo_url") or facts.get("demo_url") or "")
-        deploy_hints = facts.get("deploy_config") or []
-        if demo or deploy_hints:
-            deployed.append({"slug": slug, "demo_url": demo,
-                             "deploy_configs": deploy_hints[:5]})
+        sub = r.get("submission") or {}
+        demo_status = (facts.get("demo") or {}).get("status", "")
+        demo_url = sub.get("demo", "")
+        if demo_status == "ok" or demo_url:
+            deployed.append({"slug": slug, "demo_url": demo_url})
 
     # -- contributor counts
     contributor_ranking = []
     for slug, r in scan_results.items():
         facts = r.get("facts") or {}
-        n = len(facts.get("contributors") or [])
+        tl = facts.get("timeline") or {}
+        n = tl.get("contributors", 0)
         contributor_ranking.append({"slug": slug, "contributors": n})
     contributor_ranking.sort(key=lambda x: -x["contributors"])
 
@@ -449,10 +449,9 @@ def cross_team_analysis(scan_results: dict) -> dict[str, object]:
     total_commits = []
     for slug, r in scan_results.items():
         facts = r.get("facts") or {}
-        lines = sum(v for v in (facts.get("languages") or {}).values())
-        total_lines.append(lines)
-        commits = facts.get("commit_count", 0)
-        total_commits.append(commits)
+        tl = facts.get("timeline") or {}
+        total_lines.append(facts.get("team_code_lines", 0))
+        total_commits.append(tl.get("commits", 0))
 
     n_teams = len(scan_results)
     avg_lines = sum(total_lines) / n_teams if n_teams else 0
@@ -462,7 +461,7 @@ def cross_team_analysis(scan_results: dict) -> dict[str, object]:
     teams_with_tests = []
     for slug, r in scan_results.items():
         facts = r.get("facts") or {}
-        if facts.get("test_files"):
+        if facts.get("tests"):
             teams_with_tests.append(slug)
 
     return {
