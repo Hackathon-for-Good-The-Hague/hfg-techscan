@@ -546,34 +546,37 @@ def challenge_owner_report(
 
         # partner usage
         used_partner = False
-        if partner_key:
-            for p in (facts.get("partner_tech") or []):
-                label = p if isinstance(p, str) else p.get("label", "")
-                if partner_key.lower() in label.lower():
+        partners = facts.get("partners") or {}
+        if partner_key and partner_key in partners:
+            used_partner = True
+        elif partner_key:
+            for pk, pv in partners.items():
+                if partner_key.lower() in (pv.get("label", "") or "").lower():
                     used_partner = True
 
         # demo
-        demo_url = review.get("demo_url") or facts.get("demo_url") or ""
-        has_demo = bool(demo_url)
+        demo_info = facts.get("demo") or {}
+        demo_url = sub.get("demo", "")
+        has_demo = demo_info.get("status") == "ok" or bool(demo_url)
 
         # tests
-        has_tests = bool(facts.get("test_files"))
+        has_tests = bool(facts.get("tests"))
 
         # languages
         langs = ", ".join(sorted((facts.get("languages") or {}).keys()))
 
-        # contributors
-        contributors = len(facts.get("contributors") or [])
-
-        # commits
-        commits = facts.get("commit_count", 0)
+        # contributors and commits from timeline
+        tl = facts.get("timeline") or {}
+        contributors = tl.get("contributors", 0)
+        commits = tl.get("commits", 0)
 
         # code lines
-        code_lines = sum(v for v in (facts.get("languages") or {}).values())
+        code_lines = facts.get("team_code_lines", 0)
 
         # notable libs
-        libs = [lib if isinstance(lib, str) else lib.get("name", "")
-                for lib in (facts.get("notable_libs") or [])]
+        deps = facts.get("dependencies") or {}
+        notable = deps.get("notable") or {}
+        libs = [lib for cat_libs in notable.values() for lib in cat_libs]
 
         rows.append({
             "slug": slug,
