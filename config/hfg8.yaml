@@ -78,7 +78,7 @@ rubric:
     concept:
       label: "Concept"
       weight: 4
-      description: "Is the concept a real solution for the challenge, and more than just an idea?"
+      description: "Does the solution directly address what the challenge brief asks for? Score against the specific problem, user needs and directions in the brief. A high score means the team understood the real problem and designed something that would genuinely help the target users described in the brief."
     prototype:
       label: "Prototype"
       weight: 2

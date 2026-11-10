@@ -338,6 +338,20 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
                     + (f", technical score {rv_.get('technical_score')}" if rv_ else "")
                     + (" (cached)" if out.get("cached") else ""))
 
+    # Attach building journey narratives if observatory data exists
+    obs_dir = workdir / "observatory"
+    if obs_dir.exists() and any(obs_dir.glob("*.jsonl")):
+        try:
+            from .observe import generate_narrative
+            narratives = generate_narrative(obs_dir)
+            for slug, text in narratives.items():
+                if slug in results:
+                    results[slug]["narrative"] = text
+            if narratives:
+                log(f"Attached building journey narratives for {len(narratives)} team(s)")
+        except Exception as e:  # noqa: BLE001
+            log(f"Could not generate narratives: {e}")
+
     run_info = {
         "event": ev["name"], "started": started.isoformat(), "finished": utcnow().isoformat(),
         "deadline": ev["deadline_dt"].isoformat(), "event_start": ev["start_dt"].isoformat(),
