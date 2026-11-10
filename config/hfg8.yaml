@@ -20,21 +20,16 @@ event:
 challenges:
   acaps:
     name: "ACAPS"
-    # words that identify this challenge in Junction's challenge/track field, the template name or the repo name
     match: ["acaps", "ground truth"]
-    # VERIFY: paste the URL of the official ACAPS template repo. Left empty, it is detected from GitHub
-    # ("generated from ..."), but only templates inside github_org are trusted.
-    template: ""
-    # optional: path to the brief as markdown (relative to this file). Otherwise it is read from the template repo.
+    template: "https://github.com/Hackathon-for-Good-The-Hague/HFG8-ACAPS-Ground-Truth.git"
     brief: ""
-    # VERIFY: names of the ACAPS datasets/APIs teams were given, so the scan can see if they are used in code
-    data_hints: ["acaps", "api.acaps.org", "inform_severity", "inform severity", "crisisinsight"]
+    data_hints: ["acaps", "api.acaps.org", "inform_severity", "inform severity", "crisisinsight", "risk list", "risk radar"]
   unicri:
     name: "UNICRI: Stopping Child Abuse Before It Starts"
     match: ["unicri", "child-abuse", "child abuse", "stopping", "before it starts"]
-    template: ""
+    template: "https://github.com/Hackathon-for-Good-The-Hague/HFG8-UNICRI-Stop-Before-It-Starts.git"
     brief: ""
-    data_hints: []
+    data_hints: ["csam", "child abuse", "preventielijn", "offlimits", "warning", "intervention"]
 
 # Hackerpack partners to detect in code. Patterns are regular expressions, case-insensitive.
 # Remove this whole block to use the built-in list (Maritime, Bright Data, AWS, GreenPT, Lovable).

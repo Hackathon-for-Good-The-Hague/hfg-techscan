@@ -204,7 +204,7 @@ def cmd_challenge_report(cfg, args) -> int:
         subset = {s: r for s, r in results.items() if r["submission"].get("challenge") == key}
         if not subset:
             continue
-        html = challenge_owner_report(subset, cfg, key)
+        html = challenge_owner_report(subset, challenge_key=key, event_name=cfg["event"]["name"])
         out = Path(cfg["paths"]["output"]) / f"challenge-report-{key}.html"
         out.write_text(html, encoding="utf-8")
         log(f"  {out}")
