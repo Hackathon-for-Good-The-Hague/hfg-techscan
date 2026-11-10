@@ -3,8 +3,8 @@ name: Scheduled Scan
 # Runs every 5 minutes during event day, checks if deadline has passed, scans once.
 # Also triggerable manually for testing or re-runs.
 on:
-  schedule:
-    - cron: "*/5 * * * *"  # every 5 minutes
+  # schedule:
+  #   - cron: "*/5 * * * *"  # enable during event weekend
   workflow_dispatch:
     inputs:
       submissions:
