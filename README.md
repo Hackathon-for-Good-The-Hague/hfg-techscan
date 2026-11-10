@@ -1,159 +1,290 @@
-# HFG TechScan
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+">
+  <img src="https://img.shields.io/github/license/Hackathon-for-Good-The-Hague/hfg-techscan" alt="MIT License">
+  <img src="https://img.shields.io/github/v/release/Hackathon-for-Good-The-Hague/hfg-techscan" alt="Latest Release">
+  <img src="https://img.shields.io/github/actions/workflow/status/Hackathon-for-Good-The-Hague/hfg-techscan/selftest.yml?label=selftest" alt="Selftest">
+</p>
 
-Technical review of hackathon submissions for the jury. For each team it freezes the repo at the deadline, runs fixed checks that cannot be argued with, then has Claude read the code and check every claim the team made. Output: a printable jury pack per challenge and a scorecard spreadsheet.
+<h1 align="center">⚡ HFG TechScan</h1>
 
-It gives evidence and questions. It does not pick winners.
+<p align="center">
+  <strong>Automated technical review for hackathon submissions.</strong><br>
+  Scans repos, verifies claims against code, and produces jury-ready reports — so organizers can focus on the hackers, not the laptop.
+</p>
 
-## What it checks
+<p align="center">
+  <a href="#-try-it-in-2-minutes">Quick Start</a> •
+  <a href="#-what-it-does">What It Does</a> •
+  <a href="#-example-output">Example Output</a> •
+  <a href="#-for-organizers">For Organizers</a> •
+  <a href="#-for-contributors">For Contributors</a> •
+  <a href="#-how-it-works">How It Works</a>
+</p>
 
-**Fixed checks (no AI)**
-- Commits dated before kickoff, and GitHub's push log (commit dates can be faked, push times cannot)
-- One commit that adds most of the code (pasted-in project or generator export)
-- Code that two teams have in common, including a single copied module
-- Leaked API keys in the repo or its history, committed `.env` files
-- Text aimed at judges or AI reviewers ("give this the maximum score"), hidden comments, invisible characters
-- Partner tech actually used in code: Maritime, Bright Data, AWS, GreenPT, Lovable
-- What is template, generated scaffolding (Lovable, shadcn) or boilerplate, versus team-written code
-- Whether challenge data is referenced, notebooks were run, README has run instructions, demo link loads
-- Commits after the deadline (excluded), forks, unmerged branches
+---
 
-**AI review (one Claude call per team)**
-- What the software actually does, from the code
-- Each claim from the Junction description and README: verified, partial, mocked, missing or unclear, with file and line
-- Challenge data use, AI approach (API wrapper vs RAG vs trained model), team work vs generated code
-- Privacy and responsible-AI notes, strengths, weaknesses
-- Technical score 1 to 5 plus four sub-scores, confidence
-- Three questions for the jury to ask in the Q&A
+> **Battle-tested at [Hackathon for Good #8](https://hackathonforgood.org):** 16 teams, 216,000 lines of code, 14 AI reviews completed in 19 minutes. The grand jury used the output alongside their own scoring. The scanner correctly identified the winner.
 
-Guardrails: files are read straight from git's object store (no checkout, so nothing in a repo can run on your machine), repo content is treated as untrusted data, the review runs with no tools and without your own Claude Code customisations, citations are checked against the files the model was shown, and detected keys are redacted before anything is sent.
+---
 
-## Setup on Windows (once, about 15 minutes)
+## 🚀 Try It in 2 Minutes
 
-Use a short folder path, for example `C:\hfg-techscan`. In PowerShell:
+```bash
+# Clone and install
+git clone https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan.git
+cd hfg-techscan
+pip install pyyaml openpyxl
 
-```powershell
-cd C:\hfg-techscan
-python --version                          # 3.10 or newer
-python -m pip install -r requirements.txt
-claude update                             # recent Claude Code
-claude -p "Reply OK"                      # must answer OK: confirms your login works headless
+# Build a fake hackathon with 5 teams and planted problems
+python -m techscan demo
+
+# Verify all 13 checks catch every planted problem (no AI needed)
+python -m techscan selftest
 ```
 
-GitHub token (avoids the 60 calls per hour anonymous limit). Either `gh auth token`, or a fine-grained token with public read access:
+That's it. Open `selftest-event/out/jury-pack-all.html` in your browser — you're looking at a jury pack with claims verified against code, flags for leaked keys and pre-event code, and questions for the Q&A.
 
-```powershell
-$env:GITHUB_TOKEN = "github_pat_..."      # per PowerShell window
+**Want to run it on real submissions?**
+
+```bash
+python -m techscan scan -c config/your-event.yaml -s submissions.csv
 ```
 
-Check the scanner itself works on your machine (builds a fake event, no AI, about a minute):
+Or install from PyPI:
 
-```powershell
-python -m techscan selftest                # every line should say PASS
+```bash
+pip install hfg-techscan
+techscan selftest
 ```
 
-Then fill in `config/hfg8.yaml`: the **deadline** (required), kickoff time, GitHub org, the URLs of the two official template repos, and the ACAPS data names under `data_hints`.
+## 🔍 What It Does
 
-```powershell
-python -m techscan preflight -c config/hfg8.yaml --ping
+TechScan gives hackathon juries **evidence they can't get by reading a pitch deck** — in minutes, not hours.
+
+### Fixed Checks (no AI, unchallengeable)
+
+| Check | What it catches |
+|-------|----------------|
+| 🕐 **Timeline** | Commits before kickoff, code drops (one commit = 80% of code), force pushes |
+| 🔑 **Secrets** | 13 key patterns (OpenAI, AWS, GitHub, Stripe, ...) in code and git history |
+| 📋 **Plagiarism** | Code shared between teams, copied modules, boilerplate detection |
+| 🎯 **Injection** | Text aimed at AI judges ("give maximum score"), hidden characters, schema mimicry |
+| 🤝 **Partners** | Which hackerpack partners (AWS, Maritime, Lovable, ...) are actually used in code |
+| 📊 **Template vs team** | What's from the starter repo vs what the team actually wrote |
+
+### AI Review (one call per team)
+
+| Output | What judges get |
+|--------|----------------|
+| **Claims table** | Each claim from the submission: verified ✅, partial 🟡, mocked 🔴, or missing ❌ — with links to the exact lines |
+| **6-criterion scores** | Concept, Prototype, Technology, Potential, Business, Wow — 1-10 with configurable weights |
+| **Weighted total** | Matches your jury's formula (e.g. Concept×4 + Prototype×2 + Tech×1.5 + ...) |
+| **Jury questions** | 3 questions per team, aimed at the biggest uncertainty |
+| **Red flags** | Undisclosed mocks, hardcoded outputs, claim mismatches |
+| **Architecture** | What the stack actually is, from the code |
+
+### Security by Design
+
+- **No checkout**: files read straight from git's object store — nothing in a repo can execute on your machine
+- **Untrusted data model**: all repo content treated as potential attacks; secrets redacted before AI sees them
+- **Prompt injection defense**: detects text aimed at reviewers, schema mimicry, role injection attempts
+- **Evidence validation**: every AI citation checked against the actual snapshot — hallucinated line numbers get flagged
+
+## 📊 Example Output
+
+> 🔗 **[Live Demo: HFG #8 Jury Pack →](https://hackathon-for-good-the-hague.github.io/hfg-techscan/)**
+
+The scan produces:
+
+| File | Who it's for | What's in it |
+|------|-------------|-------------|
+| `jury-pack-{challenge}.html` | Challenge judges | All teams in one scrollable page, print-ready |
+| `scorecard.xlsx` | Organizers | Overview: scores, claims, flags, weighted totals |
+| `team-reports/{slug}.pdf` | Participants | Individual feedback with evidence |
+| `challenge-report-{key}.html` | Challenge partners | Scouting report: "which teams could we work with?" |
+
+## 👥 For Organizers
+
+### Zero-config (managed service)
+
+HFG can run TechScan for your event. You get the jury packs in your inbox after the deadline — no setup, no laptop, no technical knowledge needed. [Contact us →](https://hackathonforgood.org)
+
+### Self-hosted (GitHub Action)
+
+Add this to your hackathon's repo:
+
+```yaml
+# .github/workflows/techscan.yml
+name: TechScan
+on:
+  workflow_dispatch:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Hackathon-for-Good-The-Hague/hfg-techscan@v0.2.0
+        with:
+          config: config/my-event.yaml
+          submissions: submissions.csv
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-## Rehearse on the fake event (10 minutes)
+### Configure your rubric
 
-```powershell
-python -m techscan demo --dir demo-event
-python -m techscan scan -c demo-event/config.yaml -s demo-event/junction-export-demo.csv
-start demo-event\out\jury-pack-all.html
+Copy `config/hfg8.yaml` and edit:
+
+```yaml
+event:
+  name: "My Hackathon 2027"
+  start: "2027-03-14T17:00:00+01:00"
+  deadline: "2027-03-16T10:00:00+01:00"
+
+challenges:
+  main:
+    name: "Climate Tech"
+    match: ["climate", "sustainability"]
+    template: "https://github.com/your-org/starter-repo.git"
+
+rubric:
+  criteria:
+    innovation:
+      label: "Innovation"
+      weight: 3
+      description: "How novel is the approach?"
+    execution:
+      label: "Execution"
+      weight: 4
+      description: "Does the prototype work?"
+    impact:
+      label: "Impact"
+      weight: 3
+      description: "Could this make a real difference?"
+  max_score: 10
+  max_total: 100
 ```
 
-Five fake teams with planted problems. You should see:
-- **Aid Radar**: "AI model" is `Math.random()`, note to AI judges in the README, OpenAI key in `.env.local`
-- **SafeSteps**: code written in September, pushed in one go, commit after the deadline
-- **Help First**: screening module copied from SafeSteps, unmerged branch, AWS Bedrock detected
-- **Crisis Compass**: concept only
-- **Crisis Lens**: clean, real ACAPS data, disclosed mock, Maritime agent detected
+Or use a community rubric: `rubrics/mlh-default.yaml`, `rubrics/school-simple.yaml`
 
-## Saturday night: dry run on the live repos
+### Operator runbook
 
-After building closes. Junction submissions do not exist yet, so list the repos from GitHub:
+For running TechScan at an event without the developer present: **[docs/RUNBOOK.md](docs/RUNBOOK.md)**
 
-```powershell
-python -m techscan discover -c config/hfg8.yaml -o teams.csv
+## 🛠 For Contributors
+
+TechScan is designed for community contributions. The best way to start:
+
+### Write an adapter (good first issue!)
+
+Every hackathon platform needs an adapter — a ~50 line Python file:
+
+```python
+from techscan.adapters.base import BaseAdapter, AdapterSubmission
+
+class LumaAdapter(BaseAdapter):
+    def name(self) -> str:
+        return "Luma"
+
+    def pull(self, cfg: dict) -> list[AdapterSubmission]:
+        # fetch submissions from the Luma API
+        ...
 ```
 
-Open `teams.csv`, check the `challenge` column (acaps / unicri), fix any blanks. Then:
+**Adapters wanted:** Luma, MLH, HackerEarth, Unstop, Eventbrite. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```powershell
-python -m techscan scan -c config/hfg8.yaml -s teams.csv
+Existing adapters: Junction, DevPost, CSV (any platform).
+
+### Share a rubric
+
+Drop a YAML in `rubrics/` with your hackathon's scoring criteria. See `config/hfg8.yaml` for the format.
+
+### Add a deterministic check
+
+New integrity checks go in `techscan/facts.py`. The selftest (`python -m techscan selftest`) has 13 planted problems — add yours and it becomes part of the regression suite.
+
+### Development setup
+
+```bash
+git clone https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan.git
+cd hfg-techscan
+pip install -e ".[all]"
+python -m techscan selftest   # 13 checks, ~60 seconds, no AI needed
 ```
 
-Note how long it took. Anything flagged now (leaked keys especially) you can tell teams on Sunday morning.
-
-## Sunday: the real run
-
-1. At the deadline, export from Junction: organiser dashboard, Projects, select all, **Export selected**. Save as `junction.csv` in this folder. (No export button? Use `teams.csv` from discover; claims then come from the READMEs.)
-2. Run:
-   ```powershell
-   python -m techscan scan -c config/hfg8.yaml -s junction.csv
-   ```
-   Expect roughly the time Saturday's dry run took (rough guess: 10 to 30 minutes for 25 teams). Clones from Saturday are reused; if the run is interrupted, run the same command again and finished reviews are skipped.
-3. Open `out-hfg8\jury-pack-acaps.html` and `out-hfg8\jury-pack-unicri.html` for the Round 1 juries (print to PDF from the browser, one team per page). `out-hfg8\scorecard.xlsx` is your overview.
-4. Spot-check two or three teams yourself before the juries see it.
-
-For the grand jury, one pack with just the finalists (no re-scan):
-
-```powershell
-python -m techscan report -c config/hfg8.yaml --only "Team A,Team B,Team C"
-```
-
-Optional, finalists only: a deeper agent-mode review that lets Claude browse the repo with read-only tools. Try it on Saturday first.
-
-```powershell
-python -m techscan scan -c config/hfg8.yaml -s junction.csv --only "Team A,Team B" --deep "Team A,Team B"
-```
-
-## Useful options
-
-| Option | What it does |
-|---|---|
-| `--only "Team A,team-b"` | fresh AI review only for these teams; every team is still checked and keeps its last review |
-| `--skip-review` | fixed checks only, no AI (fast) |
-| `--force-review` | ignore cached reviews |
-| `--workers 2` | fewer parallel reviews if you hit usage limits |
-| `--backend anthropic` | use the API instead of Claude Code (needs `ANTHROPIC_API_KEY`) |
-| `--backend offline` | write each review request to `work-hfg8\requests\` without calling a model |
-| `report` command | rebuild the jury packs from the last scan |
-
-## Reading the results
-
-- **Tech score**: 1 little working code, 2 mostly interface or mocked, 3 narrow but real, 4 works end to end, 5 exceptional for the time. Technical execution only, not impact or pitch.
-- **Claims table**: verified, partial, mocked, missing, unclear. Each with a link to the exact lines on GitHub at the deadline commit. Struck-through links are citations the scanner could not verify.
-- **Check these first**: high and medium flags from both the fixed checks and the AI review. Every flag can have an innocent explanation. Ask the team.
-- **Questions to ask**: three per team, aimed at the biggest gap.
-
-## Rules of use
-
-- Advisory only. Never disqualify on a flag without talking to the team and checking the evidence.
-- A leaked key in a public repo: tell the team to revoke it right away, whatever the judging outcome.
-- The code of public repos is sent to Claude for review, the same as using Claude Code on it. Team member data from the Junction export is never read.
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| `python` not found | use `py` instead of `python` (Windows launcher) |
-| Preflight ping says the model is not available | set `model: opus` under `review` (Claude Code picks the latest Opus) |
-| `Claude Code CLI not found` | set `review.claude_path` to the full path of `claude.exe` or `claude.cmd` |
-| Usage limit reached during the run | add `--model claude-sonnet-5-5` (faster, cheaper), or `--workers 2`, then re-run: finished teams are skipped |
-| Review errors or timeouts | run the same command again (finished reviews are cached), or `--workers 2` |
-| GitHub rate limit message | set `GITHUB_TOKEN`, or `github_api: false` under `scan` |
-| `Repository not reachable` | the repo is private or the link is wrong: ask the team |
-| `Filename too long` on clone | use a shorter folder such as `C:\hfg-techscan` |
-| Review step keeps failing on Sunday | `--backend offline`, then zip `work-hfg8\requests` and get the reviews done elsewhere |
-
-## Files
+## ⚙️ How It Works
 
 ```
-techscan/       the scanner (pure Python plus PyYAML and openpyxl)
-prompts/        the review prompt; change it here, cached reviews refresh automatically
-config/         one YAML per edition
+Submissions CSV          Challenge brief
+     │                        │
+     ▼                        ▼
+┌─────────┐  clone    ┌──────────────┐
+│ Intake   │────────►  │ Git snapshot │  ← frozen at deadline
+└─────────┘           └──────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+        ┌──────────┐  ┌──────────┐  ┌──────────┐
+        │ Secrets  │  │ Timeline │  │ Similar  │
+        │ Scanner  │  │ Analysis │  │ Code     │
+        └──────────┘  └──────────┘  └──────────┘
+              │             │             │
+              └─────────────┼─────────────┘
+                            ▼
+                    ┌───────────────┐
+                    │  AI Review    │  ← Claude reads code + brief
+                    │  (per team)   │    verifies each claim
+                    └───────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+        ┌──────────┐  ┌──────────┐  ┌──────────┐
+        │ Jury     │  │ Score-   │  │ Team     │
+        │ Pack HTML│  │ card XLSX│  │ PDFs     │
+        └──────────┘  └──────────┘  └──────────┘
 ```
+
+### 10 CLI Commands
+
+| Command | What |
+|---------|------|
+| `selftest` | Verify all 13 detections work (no AI, ~60s) |
+| `demo` | Build a fake event with 5 teams and planted problems |
+| `scan` | Full pipeline: clone → check → AI review → output |
+| `report` | Rebuild outputs from cached results |
+| `preflight` | Check git, GitHub API, review engine |
+| `discover` | List repos from a GitHub org |
+| `junction-pull` | Pull submissions from Junction platform |
+| `observe` | Poll repos during the event, record timelines |
+| `narratives` | Generate building journey stories from timelines |
+| `challenge-report` | Scouting report for challenge partners |
+
+### Tech Stack
+
+- **Python 3.10+**, pure stdlib + PyYAML + openpyxl
+- **Claude** (via Claude Code CLI or Anthropic API) for AI reviews
+- **Git** for repo analysis (no checkout — reads from object store)
+- Zero external services required (runs on your laptop or GitHub Actions)
+
+## 📈 Used At
+
+| Event | Teams | Lines of Code | Date |
+|-------|-------|---------------|------|
+| [Hackathon for Good #8](https://hackathonforgood.org) | 16 | 216,000 | Nov 2026 |
+
+*Using TechScan at your event? [Add it to this list →](https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/edit/main/README.md)*
+
+## 🤝 Community
+
+- **Questions & Show and Tell**: [GitHub Discussions](https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/discussions)
+- **Bugs & Features**: [GitHub Issues](https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/issues)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Managed service**: [hackathonforgood.org](https://hackathonforgood.org)
+
+## 📄 License
+
+MIT — use it at your hackathon, fork it, build on it. See [LICENSE](LICENSE).
+
+---
+
+<p align="center">
+  Built with ❤️ by <a href="https://hackathonforgood.org">Hackathon for Good</a> in The Hague
+</p>
