@@ -99,6 +99,8 @@ DEFAULTS = {
         "api_url": "https://www.junctionorganize.com",
     },
     "builderbase": {
+        "org_slug": "hackathon-for-good",
+        "event_slug": "",
         "event_id": "",
         "api_url": "https://api.builderbase.com",
     },
