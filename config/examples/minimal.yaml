@@ -1,0 +1,15 @@
+# Minimal config — only the required fields.
+# Generate one interactively with: python -m techscan init
+
+event:
+  name: "My Hackathon 2026"
+  start: "2026-03-14T18:00:00+01:00"       # When coding begins (include UTC offset!)
+  deadline: "2026-03-16T10:00:00+01:00"     # Submission deadline
+
+challenges:
+  climate:
+    name: "Climate Action"
+    match: ["climate", "sustainability"]     # Keywords to auto-assign teams to this challenge
+  health:
+    name: "Digital Health"
+    match: ["health", "medical"]

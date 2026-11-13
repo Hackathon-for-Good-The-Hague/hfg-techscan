@@ -1,5 +1,6 @@
 """Command line: python -m techscan <command> ...
 
+  init       interactive wizard to generate a config YAML for a new event
   preflight  check git, GitHub access and the review engine before the event
   discover   list team repos in the GitHub org (for runs before Junction submissions exist)
   scan       clone, check, review and write the jury outputs
@@ -18,6 +19,53 @@ from .config import ConfigError, load_config
 from .util import ensure_utf8_console, log, parse_dt
 
 
+def _check_challenge_keywords(cfg) -> list:
+    """Check for overlapping challenge match keywords."""
+    warnings = []
+    challenges = cfg["challenges"]
+    # Build keyword -> challenge mapping
+    keyword_owners = {}
+    for key, ch in challenges.items():
+        for kw in ch.get("match", []):
+            if kw in keyword_owners:
+                warnings.append(f"Keyword \"{kw}\" matches both '{keyword_owners[kw]}' and '{key}' "
+                                f"— first match wins, teams may land in the wrong challenge")
+            else:
+                keyword_owners[kw] = key
+    # Check if any keyword is a substring of another (can cause surprising matches)
+    all_kw = list(keyword_owners.keys())
+    for i, a in enumerate(all_kw):
+        for b in all_kw[i + 1:]:
+            if a != b and (a in b or b in a):
+                shorter, longer = (a, b) if len(a) < len(b) else (b, a)
+                warnings.append(f"Keyword \"{shorter}\" is a substring of \"{longer}\" "
+                                f"(challenges '{keyword_owners[shorter]}' vs '{keyword_owners[longer]}')")
+    return warnings
+
+
+def _check_rubric_weights(cfg) -> list:
+    """Validate rubric weight configuration."""
+    warnings = []
+    rubric = cfg.get("rubric", {})
+    criteria = rubric.get("criteria", {})
+    max_score = rubric.get("max_score", 10)
+    max_total = rubric.get("max_total", 100)
+    if not criteria:
+        return warnings
+    weight_sum = sum(c.get("weight", 0) for c in criteria.values())
+    actual_max = weight_sum * max_score
+    if actual_max != max_total:
+        warnings.append(f"Rubric weights sum to {weight_sum}, so max possible total is "
+                        f"{weight_sum} x {max_score} = {actual_max}, but max_total is set to {max_total}")
+    for key, c in criteria.items():
+        w = c.get("weight", 0)
+        if w <= 0:
+            warnings.append(f"Rubric criterion '{key}' has weight {w} (zero or negative)")
+        if not c.get("description"):
+            warnings.append(f"Rubric criterion '{key}' has no description — the AI reviewer won't know how to score it")
+    return warnings
+
+
 def cmd_preflight(cfg, args) -> int:
     from .gitops import GitHub, git_available
     from .review import make_backend
@@ -31,15 +79,38 @@ def cmd_preflight(cfg, args) -> int:
     for key, ch in cfg["challenges"].items():
         log(f"     Challenge {key}: {ch['name']} (template: {ch.get('template') or 'auto from GitHub'}, "
             f"brief: {'config file' if ch.get('brief_path') else 'from template'})")
+
+    # Challenge keyword overlap check
+    kw_warnings = _check_challenge_keywords(cfg)
+    for w in kw_warnings:
+        log(f"WARN {w}")
+    ok &= not kw_warnings
+
+    # Rubric weight check
+    rubric_warnings = _check_rubric_weights(cfg)
+    for w in rubric_warnings:
+        log(f"WARN {w}")
+
+    # Partner config summary
+    partners = cfg.get("partners", {})
+    if partners:
+        log(f"OK   {len(partners)} partner pattern(s) configured: {', '.join(p.get('label', k) for k, p in partners.items())}")
+    else:
+        log("     No partner patterns configured (teams won't be checked for sponsor tool usage)")
+
     gh = GitHub(enabled=cfg["scan"].get("github_api", True))
     if gh.enabled:
         data, err = gh.get("https://api.github.com/rate_limit")
         if data:
             core = (data.get("resources") or {}).get("core") or {}
+            remaining = core.get("remaining", 0)
+            limit = core.get("limit", 0)
             log(f"OK   GitHub API {'with token' if gh.token else 'WITHOUT token'}: "
-                f"{core.get('remaining')} of {core.get('limit')} calls left this hour")
+                f"{remaining} of {limit} calls left this hour")
             if not gh.token:
                 log("     Tip: set GITHUB_TOKEN so 25+ repos do not hit the 60 calls/hour anonymous limit")
+            elif limit <= 60:
+                log("WARN Token appears to be a fine-grained token with limited scope, or rate limit is low")
         else:
             log(f"WARN GitHub API not reachable ({err}); push-log checks will be skipped")
     backend = make_backend(cfg)
@@ -262,6 +333,9 @@ def main(argv=None) -> int:
 
     p = with_config(sub.add_parser("challenge-report", help="generate scouting report for challenge owners"))
 
+    p = sub.add_parser("init", help="interactive wizard to generate a config YAML for a new event")
+    p.add_argument("-o", "--output-dir", default="config", help="directory to write the config file")
+
     p = sub.add_parser("demo", help="build a fake event with planted problems")
     p.add_argument("--dir", default="demo-event")
 
@@ -269,6 +343,9 @@ def main(argv=None) -> int:
     p.add_argument("--dir", default="selftest-event")
 
     args = ap.parse_args(argv)
+    if args.cmd == "init":
+        from .init import run_init
+        return run_init(args.output_dir)
     if args.cmd == "demo":
         from .fixtures import build_demo
         build_demo(Path(args.dir))

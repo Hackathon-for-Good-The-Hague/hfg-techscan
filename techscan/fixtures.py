@@ -524,6 +524,19 @@ def build_demo(base: Path) -> None:
             name: "UNICRI: Stopping Child Abuse Before It Starts"
             match: ["unicri", "child"]
             template: "{(repos / 'template-unicri').as_posix()}"
+        partners:
+          maritime:
+            label: "Maritime"
+            patterns: ['\\bfrom\\s+maritime\\s+import\\b', '\\bimport\\s+maritime\\b', 'api\\.maritime\\.sh',
+                       '\\bmaritime\\.sh\\b', 'MARITIME_API_KEY', '\\bmaritime\\s+(deploy|agents|keys|guide)\\b',
+                       '["\\'']maritime["\\'']\\s*:', '@maritime[-/]', '^maritime([<>=~! ].*)?$']
+          aws:
+            label: "AWS"
+            patterns: ['\\bboto3\\b', '@aws-sdk/', '["\\'']aws-sdk["\\'']', '\\.amazonaws\\.com', '\\baws-cdk\\b',
+                       '\\bbedrock-runtime\\b', 'AWS_ACCESS_KEY_ID', '\\bsagemaker\\b']
+          lovable:
+            label: "Lovable"
+            patterns: ['lovable-tagger', 'lovable\\.dev', 'lovable\\.app', 'lovableproject\\.com', 'gptengineer']
         review:
           backend: claude-cli
           model: claude-opus-5-5

@@ -1,0 +1,131 @@
+# Full config — every option documented.
+# Copy this file and fill in your event details.
+# Generate one interactively with: python -m techscan init
+
+# ── Event ────────────────────────────────────────────────────────────────────
+event:
+  name: "My Hackathon 2026"
+  short_name: "MH26"                         # Used in report headers
+  context: >-
+    A weekend hackathon connecting developers with social impact organisations.
+    Teams build prototypes that address real-world challenges.
+  build_time: "about 40 hours of building time"   # Helps the AI gauge expectations
+  start: "2026-03-14T18:00:00+01:00"              # Kickoff (include UTC offset!)
+  deadline: "2026-03-16T10:00:00+01:00"            # Submission deadline
+  github_org: "my-hackathon-org"                   # GitHub org where team repos live (for `discover`)
+
+# ── Challenges ───────────────────────────────────────────────────────────────
+# At least one challenge is required. Each challenge has:
+#   name      - display name
+#   match     - keywords to auto-assign teams (case-insensitive substring match)
+#   template  - URL of the starter/template repo (optional, for detecting template vs team code)
+#   brief     - path to a markdown file with the challenge brief (optional, sent to the AI reviewer)
+#   data_hints - keywords to detect whether teams used the provided datasets (optional)
+challenges:
+  climate:
+    name: "Climate Action"
+    match: ["climate", "sustainability", "carbon"]
+    template: "https://github.com/my-hackathon-org/template-climate.git"
+    brief: ""                                # Path to brief.md, relative to this config file
+    data_hints: ["emissions", "climate-data"]
+  health:
+    name: "Digital Health"
+    match: ["health", "medical", "patient"]
+    template: ""
+    data_hints: []
+
+# ── Partners / Sponsors ─────────────────────────────────────────────────────
+# Tools from your hackerpack sponsors to detect in team code.
+# Patterns are regular expressions, matched case-insensitively.
+# Remove this block entirely if you have no sponsor tools to detect.
+partners:
+  acme_api:
+    label: "Acme API"
+    patterns: ['acme[\s_-]?api', 'api\.acme\.com', 'ACME_API_KEY']
+  cloud_provider:
+    label: "CloudCo"
+    patterns: ['\bcloudco\b', 'cloudco\.io', 'CLOUDCO_TOKEN']
+
+# ── AI Review ────────────────────────────────────────────────────────────────
+review:
+  # claude-cli   — uses your Claude Code login (free, needs Claude Code installed)
+  # anthropic    — uses ANTHROPIC_API_KEY env var (pay per use, works in CI)
+  # offline      — no AI review, deterministic checks only
+  backend: claude-cli
+  model: claude-sonnet-4-6                   # Any Claude model ID
+  workers: 3                                 # Parallel reviews; lower to 2 if hitting rate limits
+  budget_chars: 400000                       # Max chars of code per team review
+  max_file_chars: 40000                      # Max chars per individual file
+  timeout_minutes: 15                        # Kill review if it takes longer
+  claude_path: ""                            # Full path to claude binary (if not on PATH)
+  effort: ""                                 # low / medium / high / xhigh / max (if supported)
+  deep_teams: []                             # Team slugs for agent-mode review (reads repo with tools)
+
+# ── Scoring Rubric ───────────────────────────────────────────────────────────
+# Criteria, weights and descriptions are sent to the AI reviewer.
+# Total = sum(score * weight). Adjust to match your jury sheet.
+rubric:
+  show_scores_to_jury: false                 # When false, jury packs show evidence but not AI scores
+  criteria:
+    concept:
+      label: "Concept"
+      weight: 4
+      description: "Does the solution directly address the challenge brief?"
+    prototype:
+      label: "Prototype"
+      weight: 2
+      description: "Did the team build a working prototype?"
+    technology:
+      label: "Technology feasibility"
+      weight: 1.5
+      description: "Is the technology stack sound, future-proof and ethical?"
+    potential:
+      label: "Product potential"
+      weight: 1.5
+      description: "How innovative and clear is the product opportunity?"
+    business:
+      label: "Business feasibility"
+      weight: 0.5
+      description: "How feasible is the financial and business model?"
+    wow:
+      label: "Wow factor"
+      weight: 0.5
+      description: "Quality of the pitch and the team's ability to sell the idea."
+  max_score: 10
+  max_total: 100
+
+# ── Scan Settings ────────────────────────────────────────────────────────────
+scan:
+  pre_event_grace_hours: 2                   # Commits within N hours before start aren't flagged
+  big_drop_lines: 1500                       # Code-drop detection: min lines in one commit
+  big_drop_share: 0.4                        # Code-drop detection: min share of total code
+  similarity_min_shared_lines: 25            # Plagiarism detection: min shared code lines
+  similarity_min_ratio: 0.2                  # Plagiarism detection: min ratio of smaller codebase
+  boilerplate_min_repos: 3                   # File is boilerplate if found in N+ repos
+  extra_ignore_dirs: []                      # Additional directories to skip (on top of built-ins)
+  check_demo_urls: true                      # Try to load each team's demo URL
+  github_api: true                           # Use GitHub API for push logs and metadata
+  # Extra secret patterns to detect beyond the built-in set (OpenAI, AWS, GitHub, etc.)
+  # Each entry needs a name and a regex pattern.
+  extra_secret_patterns: []
+  #  - name: "Acme API key"
+  #    pattern: "\\bacme_[A-Za-z0-9]{32,}\\b"
+
+# ── Platform Integration (optional) ─────────────────────────────────────────
+# Junction (junctionapp.io)
+# junction:
+#   event_slug: "my-hackathon-2026"
+#   event_id: 42
+#   api_url: "https://www.junctionorganize.com"
+
+# BuilderBase
+# builderbase:
+#   org_slug: "my-org"
+#   event_slug: "my-hackathon-2026"
+#   api_url: "https://api.builderbase.com"
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+# Relative to this config file's directory.
+paths:
+  workdir: ../work-my-hackathon              # Cache, snapshots, intermediate results
+  output: ../out-my-hackathon                # Final outputs (HTML jury packs, XLSX scorecard)

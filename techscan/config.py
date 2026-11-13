@@ -20,44 +20,7 @@ DEFAULTS = {
         "github_org": "",
     },
     "challenges": {},
-    "partners": {
-        "maritime": {
-            "label": "Maritime",
-            "patterns": [
-                r"\bfrom\s+maritime\s+import\b",
-                r"\bimport\s+maritime\b",
-                r"api\.maritime\.sh",
-                r"\bmaritime\.sh\b",
-                r"MARITIME_API_KEY",
-                r"\bmaritime\s+(deploy|agents|keys|guide)\b",
-                r"[\"']maritime[\"']\s*:",
-                r"@maritime[-/]",
-                r"^maritime([<>=~! ].*)?$",
-            ],
-        },
-        "brightdata": {
-            "label": "Bright Data",
-            "patterns": [r"bright[\s_-]?data", r"brd\.superproxy\.io", r"brd-customer", r"api\.brightdata\.com"],
-        },
-        "aws": {
-            "label": "AWS",
-            "patterns": [
-                r"\bboto3\b",
-                r"@aws-sdk/",
-                r"[\"']aws-sdk[\"']",
-                r"\.amazonaws\.com",
-                r"\baws-cdk\b",
-                r"\bbedrock-runtime\b",
-                r"AWS_ACCESS_KEY_ID",
-                r"\bsagemaker\b",
-            ],
-        },
-        "greenpt": {"label": "GreenPT", "patterns": [r"green[\s_-]?pt"]},
-        "lovable": {
-            "label": "Lovable",
-            "patterns": [r"lovable-tagger", r"lovable\.dev", r"lovable\.app", r"lovableproject\.com", r"gptengineer"],
-        },
-    },
+    "partners": {},
     "review": {
         "backend": "claude-cli",  # claude-cli | anthropic | offline
         "model": "claude-sonnet-4-6",
@@ -92,6 +55,7 @@ DEFAULTS = {
         "extra_ignore_dirs": [],
         "check_demo_urls": True,
         "github_api": True,
+        "extra_secret_patterns": [],
     },
     "junction": {
         "event_slug": "",
@@ -129,8 +93,8 @@ def load_config(path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     cfg = _merge(DEFAULTS, data)
-    if "partners" in data and data["partners"] is not None:
-        cfg["partners"] = data["partners"]
+    if "partners" in data:
+        cfg["partners"] = data["partners"] or {}
 
     ev = cfg["event"]
     for key in ("start", "deadline"):
@@ -164,6 +128,15 @@ def load_config(path) -> dict:
                 re.compile(pat)
             except re.error as e:
                 raise ConfigError(f"partners.{key}: invalid regex pattern {pat!r}: {e}") from e
+
+    for entry in cfg["scan"].get("extra_secret_patterns") or []:
+        if not isinstance(entry, dict) or "pattern" not in entry:
+            raise ConfigError("Each extra_secret_patterns entry needs at least a 'pattern' key")
+        try:
+            re.compile(entry["pattern"])
+        except re.error as e:
+            raise ConfigError(f"extra_secret_patterns: invalid regex {entry['pattern']!r}: {e}") from e
+        entry.setdefault("name", "Custom secret")
 
     rv = cfg["review"]
     if rv["backend"] not in ("claude-cli", "anthropic", "offline"):

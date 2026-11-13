@@ -1,4 +1,4 @@
-name: "HFG TechScan"
+name: "TechScan"
 description: "Automated technical review of hackathon submissions. Scans code repos, verifies claims, and produces jury-ready reports."
 author: "Hackathon for Good"
 
@@ -8,11 +8,10 @@ branding:
 
 inputs:
   config:
-    description: "Path to the edition config YAML"
+    description: "Path to the edition config YAML (generate one with: python -m techscan init)"
     required: true
-    default: "config/hfg8.yaml"
   submissions:
-    description: "Path to submissions CSV (leave empty to pull from Junction)"
+    description: "Path to submissions CSV (leave empty to pull from configured platform)"
     required: false
     default: ""
   github-token:
@@ -61,7 +60,7 @@ runs:
         pip install pyyaml openpyxl anthropic
         echo "Installed dependencies"
 
-    - name: Pull from Junction
+    - name: Pull from platform
       if: inputs.submissions == '' && inputs.junction-client != ''
       shell: bash
       env:
@@ -80,7 +79,7 @@ runs:
         export PYTHONPATH="${{ github.action_path }}:$PYTHONPATH"
         SUBS="${{ inputs.submissions }}"
         if [ -z "$SUBS" ]; then
-          SUBS=$(find work-* -name "junction-submissions.csv" 2>/dev/null | head -1)
+          SUBS=$(find work-* -name "*-submissions.csv" 2>/dev/null | head -1)
         fi
         if [ -z "$SUBS" ]; then
           echo "::error::No submissions file. Provide 'submissions' input or set 'junction-client'."

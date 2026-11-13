@@ -1,0 +1,126 @@
+# Example GitHub Actions workflow for running TechScan after your event.
+# Copy this file to .github/workflows/techscan.yml in your (private!) repo.
+#
+# Required secrets:
+#   ANTHROPIC_API_KEY   — for AI reviews (or use skip-review for deterministic only)
+#   SCAN_GITHUB_TOKEN   — GitHub token with public_repo scope (for push logs)
+#
+# Optional secrets:
+#   JUNCTION_CLIENT     — Junction platform cookie (if using Junction)
+#   BUILDERBASE_API_KEY — BuilderBase API key (if using BuilderBase)
+#   SMTP_HOST, SMTP_USER, SMTP_PASS — for email notifications
+#   DISCORD_WEBHOOK     — for Discord staff notifications
+#
+# Optional variables:
+#   NOTIFY_EMAILS       — comma-separated email recipients
+
+name: TechScan
+
+on:
+  workflow_dispatch:
+    inputs:
+      submissions:
+        description: "Path to submissions CSV (leave empty to pull from platform)"
+        required: false
+        default: ""
+      force:
+        description: "Force re-run even if already completed"
+        required: false
+        default: "false"
+      skip-review:
+        description: "Skip AI review (deterministic checks only)"
+        required: false
+        default: "false"
+
+# ── EDIT THIS: point to your config file ──
+env:
+  CONFIG: config/my-event.yaml
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml openpyxl anthropic
+
+      - name: Check if scan should run
+        id: gate
+        run: |
+          python -c "
+          import yaml, sys, os
+          from datetime import datetime, timezone, timedelta
+
+          with open('${{ env.CONFIG }}') as f:
+              cfg = yaml.safe_load(f)
+          deadline = cfg['event']['deadline']
+          dt = datetime.fromisoformat(deadline)
+          now = datetime.now(timezone.utc)
+          grace = dt.astimezone(timezone.utc) + timedelta(minutes=30)
+
+          if now < grace and '${{ inputs.force }}' != 'true':
+              print(f'Too early: deadline {deadline} + 30min grace not reached yet')
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as out:
+                  out.write('run=false\n')
+              sys.exit(0)
+
+          print(f'Deadline passed, scan should run')
+          with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as out:
+              out.write('run=true\n')
+          "
+
+      - name: Pull from platform (if configured)
+        if: steps.gate.outputs.run == 'true' && inputs.submissions == ''
+        env:
+          JUNCTION_CLIENT: ${{ secrets.JUNCTION_CLIENT }}
+          BUILDERBASE_API_KEY: ${{ secrets.BUILDERBASE_API_KEY }}
+        run: |
+          if [ -n "$JUNCTION_CLIENT" ]; then
+            python -m techscan junction-pull -c ${{ env.CONFIG }}
+          elif [ -n "$BUILDERBASE_API_KEY" ]; then
+            echo "BuilderBase pull: set up your adapter"
+            exit 1
+          else
+            echo "No platform credentials. Provide a submissions CSV or set platform secrets."
+            exit 1
+          fi
+
+      - name: Run scan
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.SCAN_GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          SUBS="${{ inputs.submissions }}"
+          if [ -z "$SUBS" ]; then
+            SUBS=$(find work-* -name "*-submissions.csv" 2>/dev/null | head -1)
+          fi
+          if [ -z "$SUBS" ]; then
+            echo "No submissions file found"
+            exit 1
+          fi
+          EXTRA=""
+          if [ "${{ inputs.skip-review }}" = "true" ]; then
+            EXTRA="--skip-review"
+          fi
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            EXTRA="$EXTRA --backend anthropic"
+          fi
+          python -m techscan scan -c ${{ env.CONFIG }} -s "$SUBS" $EXTRA
+
+      - name: Upload results
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: techscan-results-${{ github.run_number }}
+          path: |
+            out-*/scorecard.xlsx
+            out-*/jury-pack-*.html
+            out-*/challenge-report-*.html
+          retention-days: 30

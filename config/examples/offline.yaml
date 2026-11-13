@@ -1,0 +1,26 @@
+# Offline config — deterministic checks only, no AI review.
+# Useful for testing your setup or when you don't need AI-powered analysis.
+# Generate one interactively with: python -m techscan init
+
+event:
+  name: "My Hackathon 2026"
+  start: "2026-03-14T18:00:00+01:00"
+  deadline: "2026-03-16T10:00:00+01:00"
+
+challenges:
+  main:
+    name: "Open Track"
+    match: ["open", "general"]
+
+review:
+  backend: offline                           # No AI — runs the 13 deterministic checks only
+  # Deterministic checks still catch: pre-event commits, code drops, exposed secrets,
+  # similar code between teams, AI-directed text, partner tool usage, and more.
+
+# You can still run the full pipeline:
+#   python -m techscan scan -c config/offline.yaml -s submissions.csv --skip-review
+# The jury pack will show facts and flags but no AI review or scores.
+
+paths:
+  workdir: ../work
+  output: ../out

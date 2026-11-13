@@ -376,8 +376,21 @@ def detect_lovable(inv: Inventory) -> dict:
     return res
 
 
-def scan_secrets(inv: Inventory, history: str) -> tuple:
+def _compile_extra_secret_patterns(extra: list) -> list:
+    """Compile user-defined secret patterns from config."""
+    compiled = []
+    for entry in extra or []:
+        try:
+            rx = re.compile(entry["pattern"])
+            compiled.append((entry.get("name", "Custom secret"), rx))
+        except (re.error, KeyError):
+            pass
+    return compiled
+
+
+def scan_secrets(inv: Inventory, history: str, extra_patterns: list | None = None) -> tuple:
     """Returns (findings, raw_values). Raw values never leave memory."""
+    all_patterns = SECRET_PATTERNS + _compile_extra_secret_patterns(extra_patterns)
     findings, raw_values, seen = [], set(), set()
 
     def check(kind, value):
@@ -395,7 +408,7 @@ def scan_secrets(inv: Inventory, history: str) -> tuple:
         return True
 
     def scan_line(line, path, lineno, where, commit=""):
-        for kind, rx in SECRET_PATTERNS:
+        for kind, rx in all_patterns:
             for m in rx.finditer(line):
                 value = m.group(1) if (kind == "Hardcoded secret" and m.groups()) else m.group(0)
                 if kind == "OpenAI API key" and value.startswith("sk-ant-"):
@@ -755,7 +768,7 @@ def gather(inv: Inventory, template: dict, commits: list, history: str, cfg: dic
             lang_lines[f["lang"]] += n
             team_code_files += 1 if n else 0
 
-    secrets, raw_secrets = scan_secrets(inv, history)
+    secrets, raw_secrets = scan_secrets(inv, history, extra_patterns=sc.get("extra_secret_patterns"))
     timeline = analyze_timeline(commits, ev["start_dt"], ev["deadline_dt"], set(tmpl_hashes.keys()),
                                 sc["pre_event_grace_hours"], sc["big_drop_lines"], sc["big_drop_share"],
                                 template.get("shas", frozenset()))

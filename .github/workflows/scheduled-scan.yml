@@ -17,8 +17,9 @@ on:
         required: false
         default: "false"
 
+# Point this to your event config. Generate one with: python -m techscan init
 env:
-  CONFIG: config/hfg8.yaml
+  CONFIG: config/hfg8.yaml   # EDIT THIS for your event
 
 jobs:
   scan:
