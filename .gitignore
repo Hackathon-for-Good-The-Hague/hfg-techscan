@@ -5,3 +5,6 @@ demo-event/
 *.csv
 __pycache__/
 *.pyc
+dist/
+*.egg-info/
+selftest-event/

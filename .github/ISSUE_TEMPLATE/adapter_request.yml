@@ -1,0 +1,47 @@
+name: Adapter Request
+description: Request or offer to build an adapter for a hackathon platform
+labels: ["enhancement", "good first issue", "help wanted"]
+body:
+  - type: input
+    id: platform
+    attributes:
+      label: Platform name
+      placeholder: "e.g. Luma, MLH, HackerEarth"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Platform URL
+      placeholder: "https://lu.ma"
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: API information
+      description: Does this platform have a public API? Link to docs if available.
+      placeholder: |
+        API docs: https://...
+        Auth: API key / OAuth / cookie
+        Relevant endpoints: ...
+    validations:
+      required: false
+  - type: dropdown
+    id: willing
+    attributes:
+      label: Are you willing to build this adapter?
+      description: Adapters are typically ~50-100 lines of Python. See CONTRIBUTING.md.
+      options:
+        - "Yes, I can build it"
+        - "I can help test it"
+        - "Just requesting — someone else would need to build it"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: How many hackathons use this platform? Any quirks we should know about?
+    validations:
+      required: false

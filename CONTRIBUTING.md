@@ -1,4 +1,4 @@
-# Contributing to HFG TechScan
+# Contributing to TechScan
 
 ## Development setup
 
@@ -44,6 +44,22 @@ class MyAdapter(BaseAdapter):
         # fetch submissions, return AdapterSubmission list
         ...
 ```
+
+### Existing adapters
+
+| Adapter | Platform | Auth | Status |
+|---------|----------|------|--------|
+| `junction.py` | [Junction](https://junctionorganize.com) | Clerk cookie | Production |
+| `devpost.py` | [DevPost](https://devpost.com) | None (scraping) | Production |
+| `builderbase.py` | [BuilderBase](https://builderbase.com) | API key | Production |
+| `luma.py` | [Luma](https://lu.ma) | API key | New |
+| `hackerearth.py` | [HackerEarth](https://hackerearth.com) | OAuth2 | New |
+| `ethglobal.py` | [ETHGlobal](https://ethglobal.com) | None (scraping) | New |
+| `csv_file.py` | Any (CSV export) | None | Production |
+
+**Adapters wanted:** MLH, Unstop, Eventbrite, Devfolio, Taikai. File an
+[adapter request](https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/issues/new?template=adapter_request.yml)
+if you use a platform we don't support yet.
 
 ## Adding a deterministic check
 

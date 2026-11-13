@@ -1,0 +1,58 @@
+name: Bug Report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: When I ran `techscan scan ...`, the output was ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: I expected the jury pack to show ...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      placeholder: |
+        1. Create a config with ...
+        2. Run `python -m techscan scan -c ...`
+        3. See error ...
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: TechScan version / commit
+      description: "Output of `git log --oneline -1` or pip version"
+      placeholder: "d67595f"
+    validations:
+      required: false
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - GitHub Actions
+        - Other
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste any error messages or logs.
+      render: shell
+    validations:
+      required: false

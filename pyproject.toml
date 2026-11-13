@@ -4,18 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hfg-techscan"
-version = "0.3.0"
-description = "Automated technical review of hackathon submissions"
+version = "0.4.0"
+description = "Automated technical review for hackathon submissions"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
-authors = [{name = "Hackathon for Good"}]
-keywords = ["hackathon", "judging", "code-review", "technical-review"]
+authors = [{name = "Hackathon for Good", email = "info@hackathonforgood.org"}]
+keywords = ["hackathon", "jury", "review", "code-analysis", "technical-review"]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
@@ -30,6 +36,8 @@ all = ["anthropic>=0.40"]
 [project.urls]
 Homepage = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan"
 Repository = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan"
+Issues = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/issues"
+Discussions = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/discussions"
 
 [project.scripts]
 techscan = "techscan.__main__:main"

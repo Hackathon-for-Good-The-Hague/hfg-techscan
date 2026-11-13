@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions & Discussion
+    url: https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan/discussions
+    about: Ask questions, share your setup, or show what you built
+  - name: Managed Service
+    url: https://hackathonforgood.org
+    about: Want us to run TechScan for your event? No setup needed.

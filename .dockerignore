@@ -1,0 +1,11 @@
+.git
+__pycache__
+*.pyc
+work*
+out*
+demo-event
+selftest-event
+*.csv
+.vscode
+.env
+.env.*
