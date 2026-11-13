@@ -1,19 +1,25 @@
 """Luma (lu.ma) adapter — pull hackathon submissions from a Luma event.
 
-Luma's API allows fetching event guests and their submissions.
-Auth: set LUMA_API_KEY env var (get one from lu.ma/settings/api).
+Luma has no built-in "submissions" concept. Instead, organizers configure custom
+registration questions (Team Name, Repo URL, Demo URL, etc.) and answers come
+back in the guest's `registration_answers` array. This adapter maps those answers
+to TechScan's submission fields by matching on the question label.
+
+API docs: https://docs.luma.com/reference/getting-started-with-your-api
+Auth: set LUMA_API_KEY env var (generate at lu.ma/calendar/manage/api-keys).
+Requires Luma Plus subscription on the calendar.
 
 Config:
   luma:
-    event_id: "evt-..."           # Event ID from your Luma dashboard URL
-    api_url: "https://api.lu.ma"  # (default)
+    event_id: "evt-..."                          # Event ID from your Luma event URL
+    api_url: "https://public-api.luma.com"       # (default)
 """
 from __future__ import annotations
 
 import json
 import os
-import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from .base import AdapterSubmission, BaseAdapter
@@ -21,7 +27,7 @@ from ..util import log
 
 
 class LumaAdapter(BaseAdapter):
-    """Pull submissions from a Luma event."""
+    """Pull submissions from a Luma event via registration answers."""
 
     def name(self) -> str:
         return "Luma"
@@ -30,19 +36,20 @@ class LumaAdapter(BaseAdapter):
         luma_cfg = cfg.get("luma") or {}
         api_key = os.environ.get("LUMA_API_KEY", "")
         if not api_key:
-            raise RuntimeError("LUMA_API_KEY is not set")
+            raise RuntimeError("LUMA_API_KEY is not set (generate at lu.ma/calendar/manage/api-keys)")
         event_id = luma_cfg.get("event_id", "")
         if not event_id:
             raise RuntimeError("luma.event_id is not set in config")
-        base_url = luma_cfg.get("api_url", "https://api.lu.ma").rstrip("/")
+        base_url = luma_cfg.get("api_url", "https://public-api.luma.com").rstrip("/")
 
-        # Fetch event guests/submissions
+        # Fetch all guests with their registration answers
         subs = []
         cursor = ""
         while True:
-            url = f"{base_url}/public/v1/event/get-guests?event_api_id={event_id}&pagination_limit=100"
+            params = {"event_id": event_id, "pagination_limit": "100"}
             if cursor:
-                url += f"&pagination_cursor={cursor}"
+                params["pagination_cursor"] = cursor
+            url = f"{base_url}/v1/events/guests/list?{urllib.parse.urlencode(params)}"
             data = self._fetch_json(url, api_key)
             if not data:
                 break
@@ -50,12 +57,9 @@ class LumaAdapter(BaseAdapter):
             if not entries:
                 break
             for entry in entries:
-                guest = entry.get("guest") or {}
-                event_data = entry.get("event") or {}
-                sub = self._parse_guest(guest, event_data)
+                sub = self._parse_guest(entry)
                 if sub:
                     subs.append(sub)
-            # Pagination
             if not data.get("has_more"):
                 break
             cursor = data.get("next_cursor", "")
@@ -65,25 +69,27 @@ class LumaAdapter(BaseAdapter):
         log(f"Luma: {len(subs)} submission(s) from event {event_id}")
         return subs
 
-    def _parse_guest(self, guest: dict, event: dict) -> AdapterSubmission | None:
-        name = guest.get("name") or guest.get("user_name") or ""
+    def _parse_guest(self, entry: dict) -> AdapterSubmission | None:
+        """Parse a guest entry into an AdapterSubmission."""
+        # The entry may contain the guest directly or nested
+        guest = entry if "user_name" in entry else entry.get("guest", entry)
+        name = guest.get("user_name") or guest.get("name") or ""
         if not name:
             return None
-        # Luma stores custom form responses in approval_answers or registration_answers
-        answers = guest.get("approval_answers") or guest.get("registration_answers") or {}
-        if isinstance(answers, str):
-            try:
-                answers = json.loads(answers)
-            except ValueError:
-                answers = {}
-        repo_url = self._find_field(answers, ["github", "repo", "repository", "source_code", "github_url"])
-        demo_url = self._find_field(answers, ["demo", "demo_url", "live_url", "deployed"])
-        video_url = self._find_field(answers, ["video", "video_url", "pitch", "youtube"])
-        description = self._find_field(answers, ["description", "about", "summary", "project_description"])
-        challenge = self._find_field(answers, ["challenge", "track", "category"])
+
+        # Registration answers hold the custom form data
+        answers = guest.get("registration_answers") or []
+        answer_map = self._answers_to_map(answers)
+
+        repo_url = self._find_field(answer_map, ["github", "repo", "repository", "source_code", "github_url", "code"])
+        demo_url = self._find_field(answer_map, ["demo", "demo_url", "live_url", "deployed", "website"])
+        video_url = self._find_field(answer_map, ["video", "video_url", "pitch", "youtube", "loom"])
+        description = self._find_field(answer_map, ["description", "about", "summary", "project"])
+        challenge = self._find_field(answer_map, ["challenge", "track", "category", "theme"])
+        team_name = self._find_field(answer_map, ["team_name", "team", "project_name", "project_title"])
 
         return AdapterSubmission(
-            name=name,
+            name=team_name or name,
             repo_url=repo_url,
             description=description,
             demo_url=demo_url,
@@ -92,15 +98,31 @@ class LumaAdapter(BaseAdapter):
             status=guest.get("approval_status") or "",
         )
 
-    def _find_field(self, answers: dict, keywords: list) -> str:
-        """Find a field value by trying common field name patterns."""
-        if not isinstance(answers, dict):
-            return ""
-        for key, value in answers.items():
-            low = key.lower().replace(" ", "_").replace("-", "_")
+    def _answers_to_map(self, answers) -> dict:
+        """Convert registration_answers array to a {label: value} dict."""
+        if isinstance(answers, dict):
+            return answers
+        if not isinstance(answers, list):
+            return {}
+        result = {}
+        for ans in answers:
+            if not isinstance(ans, dict):
+                continue
+            label = ans.get("label", "")
+            value = ans.get("value", "")
+            if label and value:
+                result[label] = value
+        return result
+
+    def _find_field(self, answer_map: dict, keywords: list) -> str:
+        """Find a field value by matching question labels against keywords."""
+        for label, value in answer_map.items():
+            low = label.lower().replace(" ", "_").replace("-", "_")
             for kw in keywords:
                 if kw in low:
-                    return str(value).strip() if value else ""
+                    val = str(value).strip() if value else ""
+                    if val:
+                        return val
         return ""
 
     def _fetch_json(self, url: str, api_key: str) -> dict | None:
