@@ -214,6 +214,41 @@ rubric:
 
 See [`config/examples/full.yaml`](config/examples/full.yaml) for every option.
 
+### Custom checks (plugin system)
+
+Add your own deterministic checks by dropping Python files in a directory:
+
+```yaml
+scan:
+  custom_checks_dir: ./checks
+```
+
+```python
+# checks/license_check.py
+from techscan.checks import Check, CheckContext
+
+class LicenseCheck(Check):
+    code = "missing_license"
+    label = "License file check"
+
+    def run(self, ctx: CheckContext) -> list[dict]:
+        has_license = any(f["path"].lower().startswith("license") for f in ctx.inventory.files)
+        if not has_license:
+            return [self.flag("low", "No LICENSE file in the repository")]
+        return []
+```
+
+See [`config/examples/checks/`](config/examples/checks/) for more examples. Checks run after the built-in 13, and a crashing check never stops the scan.
+
+### Web dashboard
+
+```bash
+pip install hfg-techscan[web]
+techscan web -c config/my-event.yaml
+```
+
+Opens a local dashboard at localhost:8080 — browse results, edit config, trigger scans with live log streaming. No auth needed (binds to localhost only).
+
 ## For Contributors
 
 TechScan is designed for community contributions. The best way to start:
@@ -234,9 +269,9 @@ class LumaAdapter(BaseAdapter):
         ...
 ```
 
-**Adapters wanted:** Luma, MLH, HackerEarth, Unstop, Eventbrite. See [CONTRIBUTING.md](CONTRIBUTING.md).
+**Adapters wanted:** MLH, Unstop, Devfolio, Taikai. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Existing adapters: Junction, DevPost, BuilderBase, CSV (any platform).
+Existing adapters: Junction, DevPost, BuilderBase, Luma, HackerEarth, ETHGlobal, CSV (any platform).
 
 ### Add a deterministic check
 
@@ -283,11 +318,12 @@ Submissions CSV          Challenge brief
         +----------+  +----------+  +----------+
 ```
 
-### 11 CLI Commands
+### 12 CLI Commands
 
 | Command | What |
 |---------|------|
 | `init` | Interactive wizard — generates a config YAML for your event |
+| `web` | Local web dashboard (config editor, scan trigger, results browser) |
 | `preflight` | Verify config, git, GitHub API, and review engine |
 | `scan` | Full pipeline: clone, check, AI review, output |
 | `report` | Rebuild outputs from cached results |
@@ -305,6 +341,20 @@ Submissions CSV          Challenge brief
 - **Claude** (via Claude Code CLI or Anthropic API) for AI reviews
 - **Git** for repo analysis (no checkout — reads from object store)
 - Zero external services required (runs on your laptop or GitHub Actions)
+
+### Install options
+
+```bash
+pip install hfg-techscan            # core (CLI + deterministic checks)
+pip install hfg-techscan[api]       # + Anthropic API for AI reviews
+pip install hfg-techscan[web]       # + web dashboard
+pip install hfg-techscan[all]       # everything
+```
+
+Or run with Docker:
+```bash
+docker run ghcr.io/hackathon-for-good-the-hague/hfg-techscan selftest
+```
 
 ## Used At
 
