@@ -47,4 +47,5 @@ jobs:
 
       - name: Test image
         run: |
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} selftest
+          IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          docker run --rm "${IMAGE}:sha-$(echo '${{ github.sha }}' | head -c 7)" selftest
