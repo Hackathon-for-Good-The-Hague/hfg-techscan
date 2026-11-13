@@ -1,6 +1,7 @@
 """Command line: python -m techscan <command> ...
 
   init       interactive wizard to generate a config YAML for a new event
+  web        launch the local web dashboard (requires: pip install hfg-techscan[web])
   preflight  check git, GitHub access and the review engine before the event
   discover   list team repos in the GitHub org (for runs before Junction submissions exist)
   scan       clone, check, review and write the jury outputs
@@ -333,6 +334,11 @@ def main(argv=None) -> int:
 
     p = with_config(sub.add_parser("challenge-report", help="generate scouting report for challenge owners"))
 
+    p = with_config(sub.add_parser("web", help="launch the local web dashboard"))
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8080)
+    p.add_argument("--no-browser", action="store_true", help="don't auto-open the browser")
+
     p = sub.add_parser("init", help="interactive wizard to generate a config YAML for a new event")
     p.add_argument("-o", "--output-dir", default="config", help="directory to write the config file")
 
@@ -358,6 +364,10 @@ def main(argv=None) -> int:
     except ConfigError as e:
         log(f"Config problem: {e}")
         return 2
+    if args.cmd == "web":
+        from .web.server import start
+        start(args.config, host=args.host, port=args.port, open_browser=not args.no_browser)
+        return 0
     dispatch = {"preflight": cmd_preflight, "discover": cmd_discover, "scan": cmd_scan, "report": cmd_report,
                  "junction-pull": cmd_junction_pull, "observe": cmd_observe, "narratives": cmd_narratives,
                  "challenge-report": cmd_challenge_report}

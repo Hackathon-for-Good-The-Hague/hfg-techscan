@@ -31,7 +31,8 @@ dependencies = [
 
 [project.optional-dependencies]
 api = ["anthropic>=0.40"]
-all = ["anthropic>=0.40"]
+web = ["bottle>=0.13"]
+all = ["anthropic>=0.40", "bottle>=0.13"]
 
 [project.urls]
 Homepage = "https://github.com/Hackathon-for-Good-The-Hague/hfg-techscan"
