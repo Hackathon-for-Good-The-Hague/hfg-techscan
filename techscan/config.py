@@ -56,6 +56,7 @@ DEFAULTS = {
         "check_demo_urls": True,
         "github_api": True,
         "extra_secret_patterns": [],
+        "custom_checks_dir": "",
     },
     "junction": {
         "event_slug": "",

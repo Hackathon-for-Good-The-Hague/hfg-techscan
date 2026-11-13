@@ -224,6 +224,15 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
         F.apply_boilerplate_status(inv, boilerplate)
     names = {slug: r["submission"]["project"] for slug, r in results.items()}
 
+    # 3b. load custom checks (if configured) --------------------------------------
+    custom_checks = []
+    if sc.get("custom_checks_dir"):
+        from .checks import discover_checks
+        checks_dir = Path(sc["custom_checks_dir"])
+        if not checks_dir.is_absolute():
+            checks_dir = Path(cfg["_config_path"]).parent / checks_dir
+        custom_checks = discover_checks(checks_dir)
+
     # 4. facts per repo -----------------------------------------------------------
     secrets_raw = {}
     for slug in list(inventories):
@@ -241,6 +250,11 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
             r["facts"] = facts
             r["flags"] = F.build_flags(sub, r["snapshot"], r["github"], facts, sim,
                                        org=ev.get("github_org", ""), template=tmpl.get("url", ""))
+            if custom_checks:
+                from .checks import CheckContext, run_checks
+                ctx = CheckContext(submission=sub, snapshot=r["snapshot"], facts=facts,
+                                   flags=r["flags"], inventory=inv, github=r["github"], config=cfg)
+                r["flags"].extend(run_checks(custom_checks, ctx))
         except Exception as e:  # noqa: BLE001
             _failed(r, "error", f"Checks failed: {type(e).__name__}: {e}")
             inventories.pop(slug, None)

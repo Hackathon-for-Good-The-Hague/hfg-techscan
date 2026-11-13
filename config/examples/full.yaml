@@ -110,6 +110,9 @@ scan:
   extra_secret_patterns: []
   #  - name: "Acme API key"
   #    pattern: "\\bacme_[A-Za-z0-9]{32,}\\b"
+  # Custom checks: drop .py files in a directory, each with a Check subclass.
+  # See config/examples/checks/ for examples.
+  custom_checks_dir: ""                      # e.g. ./checks (relative to this config file)
 
 # ── Platform Integration (optional) ─────────────────────────────────────────
 # Junction (junctionapp.io)
