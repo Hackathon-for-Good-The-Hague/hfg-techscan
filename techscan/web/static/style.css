@@ -164,6 +164,32 @@ p { margin-bottom: 0.5rem; }
 .jury-questions { display: flex; flex-direction: column; gap: 0.5rem; }
 .jury-q { padding: 0.6rem 0.75rem; background: var(--surface); border-radius: 6px; border-left: 3px solid var(--accent); font-size: 0.88rem; font-style: italic; }
 
+/* ── Scan page ── */
+.prescan-info { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+.prescan-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.prescan-item { display: flex; flex-direction: column; font-size: 0.88rem; }
+.prescan-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.checkbox-label input { margin: 0; }
+
+.scan-progress { margin: 1.25rem 0; }
+.progress-header { display: flex; justify-content: space-between; margin-bottom: 0.4rem; font-size: 0.88rem; }
+.progress-phase { color: var(--accent); font-weight: 600; }
+.progress-count { color: var(--muted); }
+.progress-bar-wrap { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s ease; }
+
+.team-ticker { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.ticker-item { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+.ticker-ok { background: rgba(52, 211, 153, 0.1); color: var(--ok); }
+.ticker-err { background: rgba(248, 113, 113, 0.1); color: var(--err); }
+
+.log-details { margin: 1rem 0; }
+.log-details summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0.4rem 0; }
+.log-details summary:hover { color: var(--text); }
+
+.post-scan { margin-top: 1.5rem; }
+
 /* ── Forms ── */
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; margin-bottom: 0.25rem; color: var(--muted); font-size: 0.9rem; }
