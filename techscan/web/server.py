@@ -13,6 +13,7 @@ import webbrowser
 from pathlib import Path
 
 try:
+    import bottle
     from bottle import Bottle, request, response, static_file, template, TEMPLATE_PATH
 except ImportError:
     raise SystemExit(
@@ -248,6 +249,24 @@ def _run_scan(submissions: str, skip_review: bool):
         _scan_running.clear()
 
 
+class _ThreadedServer(bottle.ServerAdapter):
+    """Threaded WSGI server so SSE connections don't block other requests."""
+    def run(self, handler):
+        import socketserver
+        from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, make_server
+
+        class ThreadedWSGIServer(socketserver.ThreadingMixIn, WSGIServer):
+            daemon_threads = True
+
+        class QuietHandler(WSGIRequestHandler):
+            def log_request(self, *args, **kwargs):
+                pass
+
+        srv = make_server(self.host, self.port, handler, server_class=ThreadedWSGIServer,
+                          handler_class=QuietHandler)
+        srv.serve_forever()
+
+
 def start(config_path: str, host: str = "127.0.0.1", port: int = 8080, open_browser: bool = True):
     global _cfg, _config_path
     _config_path = str(Path(config_path).resolve())
@@ -257,4 +276,4 @@ def start(config_path: str, host: str = "127.0.0.1", port: int = 8080, open_brow
     log(f"Config: {_config_path}")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
-    app.run(host=host, port=port, quiet=True)
+    app.run(host=host, port=port, server=_ThreadedServer, quiet=True)
