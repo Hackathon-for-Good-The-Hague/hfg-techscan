@@ -56,25 +56,3 @@
   <p>No scan results yet. <a href="/scan">Run a scan</a> to get started.</p>
   % end
 </div>
-
-<template id="results-template">
-  <script>
-    document.addEventListener("htmx:afterSwap", function(e) {
-      if (e.detail.target.id === "results-list") {
-        try {
-          var data = JSON.parse(e.detail.xhr.responseText);
-          var html = "";
-          if (data.files && data.files.length > 0) {
-            data.files.forEach(function(f) {
-              html += '<a href="/results/' + f.name + '" class="result-link" target="_blank">' +
-                      f.name + ' <span class="size">(' + f.size_kb + ' KB)</span></a> ';
-            });
-          } else {
-            html = "<p>No output files yet.</p>";
-          }
-          document.getElementById("results-list").innerHTML = html;
-        } catch(err) {}
-      }
-    });
-  </script>
-</template>

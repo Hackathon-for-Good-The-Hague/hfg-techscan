@@ -13,7 +13,7 @@
 
 <script>
 document.addEventListener("htmx:afterSwap", function(e) {
-  if (e.detail.target.id === "save-status") {
+  if (e.detail.target && e.detail.target.id === "save-status" && e.detail.xhr) {
     try {
       var data = JSON.parse(e.detail.xhr.responseText);
       e.detail.target.innerHTML = '<span class="' + (data.ok ? 'text-ok' : 'text-err') + '">' + data.message + '</span>';

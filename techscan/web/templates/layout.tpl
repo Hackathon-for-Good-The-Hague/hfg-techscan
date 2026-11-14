@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TechScan — {{cfg.get("event", {}).get("name", "Dashboard")}}</title>
 <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>

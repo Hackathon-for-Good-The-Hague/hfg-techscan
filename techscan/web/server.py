@@ -93,14 +93,17 @@ def scan_stream():
     response.set_header("Cache-Control", "no-cache")
     response.set_header("X-Accel-Buffering", "no")
 
-    yield "data: Connected to scan stream\n\n"
+    def esc(text):
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    yield "data: <div class=\"log-line muted\">Connected to scan stream</div>\n\n"
     while _scan_running.is_set() or not _scan_log.empty():
         try:
             msg = _scan_log.get(timeout=1)
-            yield f"data: {msg}\n\n"
+            yield f"data: <div class=\"log-line\">{esc(msg)}</div>\n\n"
         except queue.Empty:
             yield ": keepalive\n\n"
-    yield "data: [DONE]\n\n"
+    yield "data: <div class=\"log-line log-done\">Scan complete. <a href=\"/\">View dashboard</a></div>\n\n"
 
 
 @app.get("/api/teams")
@@ -117,7 +120,14 @@ def results_list():
         for f in sorted(output_dir.iterdir()):
             if f.suffix in (".html", ".xlsx"):
                 files.append({"name": f.name, "size_kb": round(f.stat().st_size / 1024)})
-    return {"files": files}
+    if not files:
+        return "<p>No output files yet.</p>"
+    html = ""
+    for f in files:
+        html += (f'<a href="/results/{f["name"]}" class="result-link" target="_blank">'
+                 f'{f["name"]} <span class="size">({f["size_kb"]} KB)</span></a>\n')
+    response.content_type = "text/html"
+    return html
 
 
 # ------------------------------------------------------------------ static

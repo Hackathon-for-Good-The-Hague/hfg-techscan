@@ -21,33 +21,33 @@
 </form>
 
 <h2>Scan Output</h2>
-<div id="scan-output" class="log-output"
-     hx-ext="sse" sse-connect="/api/scan/stream" sse-swap="message" hx-swap="beforeend">
-  <div class="log-line muted">Waiting for scan output...</div>
+<div id="scan-output" class="log-output">
+  <div class="log-line muted">Click "Start Scan" to begin.</div>
 </div>
 
 <script>
+var sseSource = null;
 document.addEventListener("htmx:afterSwap", function(e) {
-  if (e.detail.target.id === "scan-status") {
+  if (e.detail.target && e.detail.target.id === "scan-status" && e.detail.xhr) {
     try {
       var data = JSON.parse(e.detail.xhr.responseText);
       e.detail.target.innerHTML = '<span class="' + (data.ok ? 'text-ok' : 'text-err') + '">' + data.message + '</span>';
+      if (data.ok) {
+        // Connect to SSE stream when scan starts
+        var el = document.getElementById("scan-output");
+        el.innerHTML = "";
+        if (sseSource) sseSource.close();
+        sseSource = new EventSource("/api/scan/stream");
+        sseSource.onmessage = function(evt) {
+          el.innerHTML += evt.data;
+          el.scrollTop = el.scrollHeight;
+        };
+        sseSource.onerror = function() {
+          sseSource.close();
+          sseSource = null;
+        };
+      }
     } catch(err) {}
   }
-  // Auto-scroll log output
-  if (e.detail.target.id === "scan-output") {
-    var el = document.getElementById("scan-output");
-    el.scrollTop = el.scrollHeight;
-  }
-});
-// Format SSE messages as log lines
-document.body.addEventListener("sse:message", function(e) {
-  var el = document.getElementById("scan-output");
-  if (e.detail.data === "[DONE]") {
-    el.innerHTML += '<div class="log-line log-done">Scan complete. <a href="/">View dashboard</a></div>';
-    return;
-  }
-  el.innerHTML += '<div class="log-line">' + e.detail.data.replace(/</g, '&lt;') + '</div>';
-  el.scrollTop = el.scrollHeight;
 });
 </script>
