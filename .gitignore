@@ -1,5 +1,5 @@
 # scan data: never commit (participant data, cloned repos, reviews)
-work*/
+/work*/
 out*/
 demo-event/
 *.csv

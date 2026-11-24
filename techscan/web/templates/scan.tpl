@@ -29,7 +29,7 @@
   <form hx-post="/api/scan" hx-target="#scan-status" hx-swap="innerHTML">
     <div class="form-group">
       <label for="submissions">Submissions CSV path</label>
-      <input type="text" name="submissions" id="submissions" placeholder="submissions.csv (or leave empty for platform pull)">
+      <input type="text" name="submissions" id="submissions" placeholder="submissions.csv (or leave empty to pull from the configured sources)">
     </div>
     <div class="form-group">
       <label class="checkbox-label">

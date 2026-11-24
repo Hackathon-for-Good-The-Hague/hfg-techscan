@@ -115,6 +115,19 @@ scan:
   custom_checks_dir: ""                      # e.g. ./checks (relative to this config file)
 
 # ── Platform Integration (optional) ─────────────────────────────────────────
+# Where submissions come from. 'scan' without -s pulls from these (or run 'pull' to check the CSV first).
+# Earlier sources win for team name and links; rows pointing at the same GitHub repo become one team,
+# and a pull request link is resolved to the team's fork and branch.
+# sources:
+#   - type: csv                 # e.g. an Alkemio export with project, repo, challenge columns
+#     path: alkemio-export.csv
+#     label: Alkemio
+#   - type: github-prs          # one PR per team into the challenge repos (defaults to each challenge's template)
+#     # repos: [{repo: "https://github.com/my-org/challenge-a", challenge: a}]
+#     # state: open             # open | all
+#     # exclude_authors: ["dependabot[bot]"]
+#   - type: junction            # uses the junction: block below
+#
 # Junction (junctionapp.io)
 # junction:
 #   event_slug: "my-hackathon-2026"

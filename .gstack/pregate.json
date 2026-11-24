@@ -1,0 +1,15 @@
+{
+  "$schema": "https://github.com/garrytan/gstack/docs/pregate.md#pregate-v1",
+  "runner": "python -m pytest {files}",
+  "dependencies": {
+    "techscan/sources.py": ["tests/test_sources.py", "tests/test_cli_report.py"],
+    "techscan/intake.py": ["tests/test_sources.py"],
+    "techscan/config.py": ["tests/test_sources.py", "tests/test_cli_report.py"],
+    "techscan/gitops.py": ["tests/test_sources.py"],
+    "techscan/__main__.py": ["tests/test_cli_report.py"],
+    "techscan/report.py": ["tests/test_cli_report.py"],
+    ".github/workflows/selftest.yml": [],
+    "config/examples/full.yaml": [],
+    "techscan/web/templates/scan.tpl": []
+  }
+}

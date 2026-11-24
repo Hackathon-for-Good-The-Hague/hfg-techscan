@@ -3,10 +3,10 @@ name: Selftest
 on:
   push:
     branches: [main]
-    paths: ["techscan/**", "prompts/**", "config/**"]
+    paths: ["techscan/**", "prompts/**", "config/**", "tests/**"]
   pull_request:
     branches: [main]
-    paths: ["techscan/**", "prompts/**", "config/**"]
+    paths: ["techscan/**", "prompts/**", "config/**", "tests/**"]
 
 jobs:
   selftest:
@@ -23,3 +23,6 @@ jobs:
 
       - name: Run selftest (13 planted-problem checks, no AI)
         run: python -m techscan selftest
+
+      - name: Unit tests (offline)
+        run: python -m unittest discover -s tests -v

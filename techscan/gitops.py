@@ -405,6 +405,26 @@ class GitHub:
             url = nxt
         return {"error": "", "items": items}
 
+    def pulls(self, owner: str, repo: str, state: str = "open", max_pages=5) -> tuple:
+        """Pull requests into owner/repo. Returns (list, error)."""
+        out, url = [], f"https://api.github.com/repos/{owner}/{repo}/pulls?state={state}&per_page=100&sort=created"
+        for _ in range(max_pages):
+            data, err, nxt = self.get_page(url)
+            if data is None:
+                return out, err
+            if not isinstance(data, list) or not data:
+                break
+            out.extend(data)
+            if not nxt:
+                break
+            url = nxt
+        return out, ""
+
+    def pull(self, owner: str, repo: str, number: int) -> tuple:
+        """One pull request. Returns (dict or None, error)."""
+        data, err = self.get(f"https://api.github.com/repos/{owner}/{repo}/pulls/{int(number)}")
+        return (data if isinstance(data, dict) else None), err
+
     def org_repos(self, org: str) -> list:
         out, url = [], f"https://api.github.com/orgs/{org}/repos?type=all&per_page=100&sort=created&direction=desc"
         for _ in range(10):

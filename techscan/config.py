@@ -58,6 +58,8 @@ DEFAULTS = {
         "extra_secret_patterns": [],
         "custom_checks_dir": "",
     },
+    # where submissions come from, in priority order (see techscan/sources.py); empty = pass -s <csv>
+    "sources": [],
     "junction": {
         "event_slug": "",
         "event_id": "",
@@ -138,6 +140,14 @@ def load_config(path) -> dict:
         except re.error as e:
             raise ConfigError(f"extra_secret_patterns: invalid regex {entry['pattern']!r}: {e}") from e
         entry.setdefault("name", "Custom secret")
+
+    if not isinstance(cfg.get("sources"), list):
+        raise ConfigError("sources must be a list, e.g. [{type: github-prs}, {type: csv, path: alkemio.csv}]")
+    for i, src in enumerate(cfg["sources"]):
+        if not isinstance(src, dict) or src.get("type") not in ("github-prs", "csv", "junction"):
+            raise ConfigError(f"sources[{i}]: type must be github-prs, csv or junction")
+        if src["type"] == "csv" and not src.get("path"):
+            raise ConfigError(f"sources[{i}]: a csv source needs a 'path'")
 
     rv = cfg["review"]
     if rv["backend"] not in ("claude-cli", "anthropic", "offline"):

@@ -434,6 +434,17 @@ def _score_summary(r: dict) -> str:
     return " ".join(parts)
 
 
+def platform_link(sub: dict) -> tuple:
+    """(url, label) for the team's page on the submission platform, or ('', '')."""
+    url = sub.get("platform_url") or sub.get("junction_url") or ""  # junction_url: results from older scans
+    if not url:
+        return "", ""
+    if "/pull/" in url:
+        return url, "Pull request"
+    src = (sub.get("source") or "csv").split(" + ")[0]
+    return url, {"junction": "Junction page", "csv": "Submission page"}.get(src.lower(), f"{src} page")
+
+
 def _team_html(r: dict, cfg: dict) -> str:
     sub, f, rv, snap = r["submission"], r.get("facts") or {}, r.get("review") or {}, r.get("snapshot") or {}
     chal = (cfg["challenges"].get(sub.get("challenge")) or {}).get("name", sub.get("challenge_raw") or "Challenge unknown")
@@ -459,8 +470,9 @@ def _team_html(r: dict, cfg: dict) -> str:
         links.append(f'<a href="{e(sub["demo"])}" target="_blank" rel="noopener">Demo</a>')
     if sub.get("video"):
         links.append(f'<a href="{e(sub["video"])}" target="_blank" rel="noopener">Video</a>')
-    if sub.get("junction_url"):
-        links.append(f'<a href="{e(sub["junction_url"])}" target="_blank" rel="noopener">Junction page</a>')
+    platform_url, label = platform_link(sub)
+    if platform_url:
+        links.append(f'<a href="{e(platform_url)}" target="_blank" rel="noopener">{e(label)}</a>')
     out.append(f'<div class="links" style="margin-top:6px">{"".join(links)}</div>')
 
     rubric = cfg.get("rubric") or {}
