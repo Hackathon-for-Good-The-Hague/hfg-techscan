@@ -62,7 +62,8 @@ def _attr(value: str) -> str:
 
 
 def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: list, raw_secrets,
-               budget_chars: int, max_file_chars: int, include_content: bool = True) -> tuple:
+               budget_chars: int, max_file_chars: int, include_content: bool = True,
+               brief_chars: int = 14000) -> tuple:
     """Returns (user_text, pack_info). With include_content=False only the manifest is listed (deep mode)."""
     candidates = [f for f in inv.files
                   if f["status"] not in ("template", "scaffold", "boilerplate")
@@ -168,7 +169,7 @@ def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: 
     ]
     user = "\n".join([
         "<challenge_brief>",
-        truncate(brief or "(No brief available. Judge against the project's own goals.)", 14000),
+        truncate(brief or "(No brief available. Judge against the project's own goals.)", brief_chars),
         "</challenge_brief>",
         "",
         "<submission>",

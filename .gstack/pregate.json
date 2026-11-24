@@ -2,14 +2,52 @@
   "$schema": "https://github.com/garrytan/gstack/docs/pregate.md#pregate-v1",
   "runner": "python -m pytest {files}",
   "dependencies": {
-    "techscan/sources.py": ["tests/test_sources.py", "tests/test_cli_report.py"],
-    "techscan/intake.py": ["tests/test_sources.py"],
-    "techscan/config.py": ["tests/test_sources.py", "tests/test_cli_report.py"],
-    "techscan/gitops.py": ["tests/test_sources.py"],
-    "techscan/__main__.py": ["tests/test_cli_report.py"],
-    "techscan/report.py": ["tests/test_cli_report.py"],
+    "techscan/sources.py": [
+      "tests/test_sources.py",
+      "tests/test_cli_report.py"
+    ],
+    "techscan/intake.py": [
+      "tests/test_sources.py"
+    ],
+    "techscan/config.py": [
+      "tests/test_sources.py",
+      "tests/test_cli_report.py",
+      "tests/test_rubric_language.py"
+    ],
+    "techscan/gitops.py": [
+      "tests/test_sources.py"
+    ],
+    "techscan/__main__.py": [
+      "tests/test_cli_report.py",
+      "tests/test_rubric_language.py"
+    ],
+    "techscan/report.py": [
+      "tests/test_cli_report.py",
+      "tests/test_rubric_language.py"
+    ],
     ".github/workflows/selftest.yml": [],
     "config/examples/full.yaml": [],
-    "techscan/web/templates/scan.tpl": []
+    "techscan/web/templates/scan.tpl": [],
+    "techscan/review.py": [
+      "tests/test_rubric_language.py"
+    ],
+    "techscan/pipeline.py": [
+      "tests/test_rubric_language.py"
+    ],
+    "techscan/pack.py": [
+      "tests/test_rubric_language.py"
+    ],
+    "prompts/review_system.md": [
+      "tests/test_rubric_language.py"
+    ],
+    "prompts/scale_10.md": [
+      "tests/test_rubric_language.py"
+    ],
+    "prompts/scale_5.md": [
+      "tests/test_rubric_language.py"
+    ],
+    "config/onegov3.yaml": [
+      "tests/test_rubric_language.py"
+    ]
   }
 }

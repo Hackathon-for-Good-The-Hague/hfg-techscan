@@ -1,0 +1,117 @@
+# OneGov AI Hackathon Series, Editie #3 (GovTechNL), 9-10 December 2026, The Hague Tech
+# Lines marked FILL IN or VERIFY need your input before the event. Times need a UTC offset (+01:00 in December).
+#
+# Event day (jury Ronde 1 at 14:00, deadline 13:00): run the scan at 11:00 and 12:00 as well.
+# Reviews are cached per team input, so the 13:00 run only re-reviews teams that pushed since.
+#   python -m techscan preflight -c config/onegov3.yaml --ping
+#   python -m techscan pull -c config/onegov3.yaml        # check the merged CSV
+#   python -m techscan scan -c config/onegov3.yaml
+
+event:
+  name: "OneGov AI Hackathon Series - Editie #3"
+  short_name: "OneGov #3"
+  context: >-
+    OneGov is the GovTechNL hackathon series where civil servants, developers and partners build open,
+    reusable solutions for Dutch government. Theme of this edition: digital autonomy and sovereignty
+    (digitale autonomie en soevereiniteit). Teams fork the challenge repository and submit one pull request
+    each; code must be open source.
+  build_time: "about a day and a half of building (9 December and the morning of 10 December)"
+  # VERIFY: kickoff time. Commits dated more than 2 hours before this get flagged.
+  start: "2026-12-09T09:00:00+01:00"
+  # VERIFY: submission deadline (13:00 per the organisers). The scan reviews the last commit before this moment.
+  deadline: "2026-12-10T13:00:00+01:00"
+  github_org: "govtechnl"
+
+# Teams fork the challenge repo and open one PR each (work under submissions/<team>/).
+# github-prs reads each challenge's template repo below. Alkemio comes first so its team names win.
+sources:
+  # FILL IN when the Alkemio adapter or an Alkemio export is ready (columns: project, repo, challenge).
+  # A repo link or a pull request link in the Alkemio post is resolved to the team's fork and branch.
+  # - type: csv
+  #   path: ../alkemio-onegov3.csv
+  #   label: Alkemio
+  - type: github-prs
+    exclude_authors: ["dependabot[bot]"]
+
+challenges:
+  inkooptafel:
+    name: "Van classificatie naar inkooptafel"
+    match: ["inkooptafel", "inkoop", "procurement", "classificatie"]
+    template: "https://github.com/govtechnl/onegov3-inkooptafel.git"
+    # judging criteria first: the brief is capped at review.brief_chars
+    brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
+    data_hints: ["classification.yaml", "patterns.yaml", "sources.yaml", "sovereignty", "soevereiniteit", "gibit"]
+  inferentie-netwerk:
+    name: "Inferentie-netwerk"
+    match: ["inferentie", "inference"]
+    template: "https://github.com/govtechnl/onegov3-inferentie-netwerk.git"
+    # FILL IN once the repo has content (it is empty on 24 Nov)
+    brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
+    data_hints: []
+  # FILL IN: two more challenges are coming. Copy a block above and point template at the repo.
+
+# Partner tools to detect in code (regular expressions, case-insensitive).
+partners:
+  greenpt:
+    label: "GreenPT"
+    patterns: ['green[\s_-]?pt', 'api\.greenpt\.']
+
+review:
+  # claude-cli uses your Claude Code login; a GreenPT backend is planned next to it.
+  backend: claude-cli
+  model: claude-sonnet-4-6
+  workers: 4
+  # AI-written text (summaries, claims, jury questions) in Dutch; fixed labels stay English
+  language: nl
+  budget_chars: 400000
+  max_file_chars: 40000
+  brief_chars: 20000
+  timeout_minutes: 15
+  claude_path: ""
+  effort: ""
+  deep_teams: []
+
+# Scorekaart Ronde 1 (challenge owners and technical jury, 10 Dec 14:00): six criteria, 1-5, total /30.
+# The Finale card swaps Technische kwaliteit for Presentatie, which the code cannot show; use Ronde 1 here.
+rubric:
+  show_scores_to_jury: false
+  max_score: 5
+  max_total: 30
+  criteria:
+    impact:
+      label: "Impact"
+      weight: 1
+      description: "Lost het de vraag structureel op? (Does it solve the question structurally, not just for one case?)"
+    uitvoerbaarheid:
+      label: "Uitvoerbaarheid"
+      weight: 1
+      description: "Realistisch te implementeren binnen een overheidsorganisatie? (Realistic to implement inside a government organisation: dependencies, security, maintainability, fit with existing systems.)"
+    autonomie:
+      label: "Digitale autonomie"
+      weight: 1
+      description: "Meer regie over eigen data, systemen of infrastructuur? (Does it give government more control over its own data, systems or infrastructure, or does it add lock-in to a single vendor or non-EU service?)"
+    open_source:
+      label: "Open source potentie"
+      weight: 1
+      description: "Kunnen anderen het hergebruiken en doorontwikkelen? (Can others reuse and build on it: open licence, documentation, reproducible setup, rules separate from code.)"
+    aansluiting:
+      label: "Aansluiting challenge"
+      weight: 1
+      description: "Beantwoordt het de gestelde vraag? Score against the Must/Should criteria in the brief; failing a Must caps this score."
+    technisch:
+      label: "Technische kwaliteit"
+      weight: 1
+      description: "Werkt het, is de repository bruikbaar? (Does it work, and can someone clone and run the repository?)"
+
+scan:
+  pre_event_grace_hours: 2
+  big_drop_lines: 1500
+  big_drop_share: 0.4
+  similarity_min_shared_lines: 25
+  similarity_min_ratio: 0.2
+  check_demo_urls: true
+  github_api: true
+
+paths:
+  workdir: ../work-onegov3
+  output: ../out-onegov3

@@ -95,10 +95,35 @@ class ReviewError(Exception):
     pass
 
 
+LANGUAGES = {"en": "English", "nl": "Dutch (Nederlands)", "de": "German", "fr": "French"}
+
+
+def scale_text(max_score) -> tuple:
+    """(intro, technical) scoring-scale sections for a 1-5 or 1-10 rubric."""
+    name = "scale_5.md" if int(max_score or 10) <= 5 else "scale_10.md"
+    intro, technical = (PROMPTS_DIR / name).read_text(encoding="utf-8").split("@@TECHNICAL@@\n", 1)
+    return intro, technical
+
+
+def language_rule(code: str) -> tuple:
+    """(language name for 'plain ...', extra rule appended after it). English adds nothing."""
+    code = (code or "en").lower()
+    name = LANGUAGES.get(code, code)
+    if code == "en":
+        return "English", ""
+    return name, (f"\n- Write every free-text field (summary, notes, strengths, weaknesses, rationales, jury questions) "
+                  f"in {name}. Keep JSON keys, enum values, file paths, code identifiers and quoted code exactly "
+                  f"as they are. Do not use em dashes.")
+
+
 def system_prompt(cfg: dict, challenge: dict, deep: bool = False) -> str:
     schema = build_schema(cfg)
     text = (PROMPTS_DIR / "review_system.md").read_text(encoding="utf-8")
     ev = cfg["event"]
+    intro, technical = scale_text((cfg.get("rubric") or {}).get("max_score", 10))
+    lang_name, lang_rule = language_rule((cfg.get("review") or {}).get("language", "en"))
+    text = (text.replace("{{SCALE_INTRO}}", intro).replace("{{SCALE_TECHNICAL}}", technical)
+                .replace("{{LANGUAGE_RULE}}", lang_rule).replace("{{LANGUAGE}}", lang_name))
     text = (text.replace("{{EVENT_NAME}}", ev.get("name", "a hackathon"))
                 .replace("{{EVENT_CONTEXT}}", ev.get("context", ""))
                 .replace("{{BUILD_TIME}}", ev.get("build_time", "a weekend"))
@@ -183,7 +208,7 @@ def _evidence(items, file_lines: dict, seen_files: dict):
     return out, bad
 
 
-def validate(data, file_lines: dict, seen_files: dict) -> dict:
+def validate(data, file_lines: dict, seen_files: dict, max_score: int = 10) -> dict:
     """Coerce model output into the schema and check every citation against the snapshot."""
     if not isinstance(data, dict):
         raise ReviewError("Model output was not a JSON object")
@@ -241,8 +266,10 @@ def validate(data, file_lines: dict, seen_files: dict) -> dict:
                                "detail": truncate(str(f.get("detail", "")), 500), "evidence": ev(f.get("evidence"))})
     r["jury_questions"] = [truncate(str(q), 300) for q in (data.get("jury_questions") or []) if str(q).strip()][:3]
     sc = data.get("scores") or {}
-    r["scores"] = {k: _clamp(sc.get(k), default=5) for k in sc if isinstance(sc.get(k), (int, float, str))}
-    r["technical_score"] = _clamp(data.get("technical_score"))
+    mid = (int(max_score) + 1) // 2  # an unreadable score lands mid-scale, never at the top
+    r["scores"] = {k: _clamp(sc.get(k), default=mid, hi=max_score)
+                   for k in sc if isinstance(sc.get(k), (int, float, str))}
+    r["technical_score"] = _clamp(data.get("technical_score"), hi=max_score)
     conf = str(data.get("confidence", "medium")).lower()
     r["confidence"] = conf if conf in ("high", "medium", "low") else "medium"
     r["evidence_checked"] = {"total": ev_total, "invalid": bad_total}
@@ -447,12 +474,16 @@ def cache_key(system_text: str, user_text: str, deep: bool) -> str:
     return sha256_text("|".join([PROMPT_VERSION, str(deep), system_text, user_text]))
 
 
+def _max_score(cfg) -> int:
+    return int((cfg.get("rubric") or {}).get("max_score", 10))
+
+
 def cached_review(cfg, slug, system_text, user_text, deep, file_lines, seen_files):
     """The stored review for exactly this input, or None."""
     cached = read_json(Path(cfg["paths"]["workdir"]) / "reviews" / f"{slug}.json")
     if isinstance(cached, dict) and cached.get("key") == cache_key(system_text, user_text, deep) and cached.get("raw"):
         try:
-            return {"meta": cached.get("meta", {}), "review": validate(cached["raw"], file_lines, seen_files)}
+            return {"meta": cached.get("meta", {}), "review": validate(cached["raw"], file_lines, seen_files, _max_score(cfg))}
         except ReviewError:
             return None
     return None
@@ -466,7 +497,7 @@ def run_review(backend, cfg, slug, system_text, user_text, cwd, deep, file_lines
     if not force and isinstance(cached, dict) and cached.get("key") == key and cached.get("raw"):
         try:
             return {"status": "ok", "cached": True, "meta": cached.get("meta", {}),
-                    "review": validate(cached["raw"], file_lines, seen_files)}
+                    "review": validate(cached["raw"], file_lines, seen_files, _max_score(cfg))}
         except ReviewError:
             pass
     last_err = ""
@@ -476,7 +507,7 @@ def run_review(backend, cfg, slug, system_text, user_text, cwd, deep, file_lines
                 raw, meta = backend.review(system_text, user_text, cwd, deep, slug=slug)
             else:
                 raw, meta = backend.review(system_text, user_text, cwd, deep)
-            review = validate(raw, file_lines, seen_files)
+            review = validate(raw, file_lines, seen_files, _max_score(cfg))
             write_json(cache_file, {"key": key, "raw": raw, "meta": meta, "prompt_version": PROMPT_VERSION})
             return {"status": "ok", "cached": False, "meta": meta, "review": review}
         except ReviewError as e:

@@ -38,7 +38,7 @@ def _check_challenge_keywords(cfg) -> list:
     all_kw = list(keyword_owners.keys())
     for i, a in enumerate(all_kw):
         for b in all_kw[i + 1:]:
-            if a != b and (a in b or b in a):
+            if a != b and (a in b or b in a) and keyword_owners[a] != keyword_owners[b]:
                 shorter, longer = (a, b) if len(a) < len(b) else (b, a)
                 warnings.append(f"Keyword \"{shorter}\" is a substring of \"{longer}\" "
                                 f"(challenges '{keyword_owners[shorter]}' vs '{keyword_owners[longer]}')")

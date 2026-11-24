@@ -191,7 +191,7 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
         ]
         if show_scores:
             row = ([sub["project"], chal, round(weighted, 1) if weighted else None] + crit_scores +
-                   [rv.get("technical_score"), rv.get("confidence", ""), _score_summary(r)] + common_cols)
+                   [rv.get("technical_score"), rv.get("confidence", ""), _score_summary(r, rubric.get("max_score", 10))] + common_cols)
         else:
             row = [sub["project"], chal] + common_cols
         _append(ws, row)
@@ -205,10 +205,11 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
                 ws.cell(row=i, column=3).fill = PatternFill("solid", fgColor=SCORE_FILL_10[bucket])
                 ws.cell(row=i, column=3).font = Font(name="Calibri", bold=True)
         # Color each criterion score cell
+        fills = SCORE_FILL_5 if rubric.get("max_score", 10) <= 5 else SCORE_FILL_10
         for ci, k in enumerate(criteria):
             v = scores.get(k)
-            if v and v in SCORE_FILL_10:
-                ws.cell(row=i, column=4 + ci).fill = PatternFill("solid", fgColor=SCORE_FILL_10[v])
+            if v and v in fills:
+                ws.cell(row=i, column=4 + ci).fill = PatternFill("solid", fgColor=fills[v])
         # Repo hyperlink (column shifts with dynamic criteria)
         repo_col = 4 + len(criteria) + 18  # after criteria + fixed columns
         if sub.get("repo_url", "").startswith("http"):
@@ -389,7 +390,7 @@ def _readme_quality(rd: dict) -> str:
     return f"{parts[0]} ({q}/6){detail}"
 
 
-def _score_summary(r: dict) -> str:
+def _score_summary(r: dict, max_score: int = 10) -> str:
     """One plain-language paragraph explaining what the tech score means, for non-technical judges."""
     rv = r.get("review") or {}
     score = rv.get("technical_score")
@@ -402,7 +403,6 @@ def _score_summary(r: dict) -> str:
     parts = []
     if score is None:
         return ""
-    max_score = (r.get("_rubric") or {}).get("max_score", 10)
     if max_score <= 5:
         label = {1: "very little working code", 2: "mostly user interface or mocked functionality",
                  3: "a narrow but real working feature", 4: "a working end-to-end solution",
@@ -507,7 +507,7 @@ def _team_html(r: dict, cfg: dict) -> str:
         rows.append(f'<div class="row"><span class="lab">Confidence</span><b>{e(rv.get("confidence", ""))}</b></div>')
         subs_html = "".join(rows)
     out.append(f'<div class="top">{badge}<div class="subs">{subs_html}</div></div>')
-    tldr = _score_summary(r) if show_scores else ""
+    tldr = _score_summary(r, rubric.get("max_score", 10)) if show_scores else ""
     if tldr:
         out.append(f'<p class="small" style="margin:6px 0 4px;color:#4b5563"><b>In short:</b> {e(tldr)}</p>')
     if rv.get("summary"):
@@ -615,7 +615,7 @@ def render_html(cfg: dict, run: dict, results: dict, title_suffix: str = "") -> 
 <p>Code frozen at the deadline ({e(deadline)}). Generated {e(_local(cfg, run.get('finished', '')))}.</p></div></div>
 <div class="wrap"><div class="howto"><p><b>How to use this.</b> Each team's page shows what their code really does, which claims hold up, and three questions to ask.
 This is advisory evidence, not a verdict: the score covers technical execution only, and every flag can have an innocent explanation. Ask the team before you decide.</p>
-<p class="small">{"Scores are 1-10 per criterion, weighted to a total out of " + e(str(max_total)) + "." if show_scores else "AI scores are hidden until the jury has scored independently."} Links open the exact lines on GitHub as they were at the deadline.</p></div>
+<p class="small">{f"Scores are 1-{rubric.get('max_score', 10)} per criterion, weighted to a total out of " + e(str(max_total)) + "." if show_scores else "AI scores are hidden until the jury has scored independently."} Links open the exact lines on GitHub as they were at the deadline.</p></div>
 <table class="summary"><tr><th>Team</th><th>Challenge</th><th class="score">Score</th><th>Claims verified</th><th>High flags</th></tr>{''.join(rows)}</table>"""
     parts = []
     for _, r in _order(results, cfg, by_score=False):

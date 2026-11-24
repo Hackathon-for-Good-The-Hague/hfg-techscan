@@ -27,10 +27,12 @@ DEFAULTS = {
         "workers": 3,
         "budget_chars": 400000,
         "max_file_chars": 40000,
+        "brief_chars": 14000,  # how much of the challenge brief the model sees
         "timeout_minutes": 15,
         "claude_path": "",
         "effort": "",
         "deep_teams": [],
+        "language": "en",  # language of the AI-written text in the jury pack: en, nl, de, fr
     },
     "rubric": {
         "show_scores_to_jury": False,  # when False, jury packs show evidence/claims/flags but not AI scores
@@ -98,6 +100,8 @@ def load_config(path) -> dict:
     cfg = _merge(DEFAULTS, data)
     if "partners" in data:
         cfg["partners"] = data["partners"] or {}
+    if (data.get("rubric") or {}).get("criteria"):
+        cfg["rubric"]["criteria"] = data["rubric"]["criteria"]  # an event's own criteria replace the defaults
 
     ev = cfg["event"]
     for key in ("start", "deadline"):
@@ -118,6 +122,8 @@ def load_config(path) -> dict:
         ch["match"] = [m.lower() for m in (ch.get("match") or [key])]
         ch["data_hints"] = [h.lower() for h in (ch.get("data_hints") or [])]
         ch.setdefault("template", "")
+        if not isinstance(ch.get("brief_files") or [], list):
+            raise ConfigError(f"challenges.{key}.brief_files must be a list of paths in the template repo")
         brief = ch.get("brief") or ""
         if brief:
             bp = (base / brief).resolve()
@@ -148,6 +154,10 @@ def load_config(path) -> dict:
             raise ConfigError(f"sources[{i}]: type must be github-prs, csv or junction")
         if src["type"] == "csv" and not src.get("path"):
             raise ConfigError(f"sources[{i}]: a csv source needs a 'path'")
+
+    rb = cfg["rubric"]
+    if rb.get("max_score") not in (5, 10):
+        raise ConfigError("rubric.max_score must be 5 or 10 (the scales the review prompt has anchors for)")
 
     rv = cfg["review"]
     if rv["backend"] not in ("claude-cli", "anthropic", "offline"):
