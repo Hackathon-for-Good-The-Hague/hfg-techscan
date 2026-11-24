@@ -319,7 +319,7 @@ def main(argv=None) -> int:
     p.add_argument("--force-review", action="store_true", help="ignore cached reviews")
     p.add_argument("--deep", default="", help="comma-separated teams to review in agent mode (finalists)")
     p.add_argument("--workers", type=int, default=0)
-    p.add_argument("--backend", choices=["claude-cli", "anthropic", "offline"], default="")
+    p.add_argument("--backend", choices=["claude-cli", "anthropic", "greenpt", "openai-compatible", "offline"], default="")
     p.add_argument("--model", default="")
 
     p = with_config(sub.add_parser("report", help="rebuild outputs from the last scan"))

@@ -96,9 +96,18 @@ partners:
     patterns: ['green[\s_-]?pt', 'api\.greenpt\.']
 
 review:
-  # claude-cli uses your Claude Code login; a GreenPT backend is planned next to it.
+  # claude-cli uses your Claude Code login. GreenPT (EU-hosted open models, the edition's tech partner) is the
+  # alternative: set GREENPT_API_KEY, switch the lines below, then list its models with
+  #   python -m techscan preflight -c config/onegov3.yaml --ping
+  # (scan also takes --backend greenpt --model <id> to try it without editing this file)
+  # Both backends keep separate review caches, so you can run one, then the other, and compare.
+  # Open models have smaller context windows: if reviews fail as "too long", lower budget_chars (the scan
+  # already retries once with half).
   backend: claude-cli
   model: claude-sonnet-4-6
+  # backend: greenpt
+  # model: ""              # FILL IN from preflight --ping, e.g. a large instruction model
+  # budget_chars: 200000
   workers: 4
   # AI-written text (summaries, claims, jury questions) in Dutch; fixed labels stay English
   language: nl

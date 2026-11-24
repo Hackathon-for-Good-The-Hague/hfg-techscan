@@ -9,6 +9,8 @@ import yaml
 
 from .util import parse_dt
 
+BACKENDS = ("claude-cli", "anthropic", "greenpt", "openai-compatible", "offline")
+
 DEFAULTS = {
     "event": {
         "name": "Hackathon for Good",
@@ -32,7 +34,11 @@ DEFAULTS = {
         "claude_path": "",
         "effort": "",
         "deep_teams": [],
-        "language": "en",  # language of the AI-written text in the jury pack: en, nl, de, fr
+        "language": "en",
+        # greenpt / openai-compatible only: API root, the env var holding the key, and json output mode
+        "api_base": "",          # greenpt default: https://api.greenpt.ai/v1
+        "api_key_env": "",       # greenpt default: GREENPT_API_KEY; openai-compatible: OPENAI_API_KEY
+        "response_format": "",   # json_schema (default) | json_object | text; steps down automatically  # language of the AI-written text in the jury pack: en, nl, de, fr
     },
     "rubric": {
         "show_scores_to_jury": False,  # when False, jury packs show evidence/claims/flags but not AI scores
@@ -167,8 +173,8 @@ def load_config(path) -> dict:
         raise ConfigError("rubric.max_score must be 5 or 10 (the scales the review prompt has anchors for)")
 
     rv = cfg["review"]
-    if rv["backend"] not in ("claude-cli", "anthropic", "offline"):
-        raise ConfigError("review.backend must be claude-cli, anthropic or offline")
+    if rv["backend"] not in BACKENDS:
+        raise ConfigError(f"review.backend must be one of {', '.join(BACKENDS)}")
     try:
         rv["workers"] = max(1, int(rv["workers"]))
     except (TypeError, ValueError) as e:
