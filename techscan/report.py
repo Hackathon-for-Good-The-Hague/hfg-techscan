@@ -10,6 +10,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from .gitops import blob_url
+from .requirements import report_rows
 from .branding import brand, dedash, logos_html, theme_css, xlsx_hex
 from .util import fmt_dt, log, parse_dt, read_json, truncate, write_json
 
@@ -490,6 +491,8 @@ def _team_html(r: dict, cfg: dict) -> str:
     platform_url, label = platform_link(sub)
     if platform_url:
         links.append(f'<a href="{e(platform_url)}" target="_blank" rel="noopener">{e(label)}</a>')
+    if sub.get("pr_url") and sub["pr_url"] != platform_url:
+        links.append(f'<a href="{e(sub["pr_url"])}" target="_blank" rel="noopener">Pull request</a>')
     out.append(f'<div class="links" style="margin-top:6px">{"".join(links)}</div>')
 
     rubric = cfg.get("rubric") or {}
@@ -587,7 +590,7 @@ def _team_html(r: dict, cfg: dict) -> str:
         tr("Reviewed by", e(" ".join(x for x in [(r.get("review_meta") or {}).get("model", ""),
                                                   "(agent mode)" if (r.get("review_meta") or {}).get("deep") else ""] if x)) if rv else ""),
         tr("Snapshot", e(f"{snap.get('short', '')} on {snap.get('branch', '')}, {_local(cfg, snap.get('commit_date'))} (chosen by {snap.get('method', '')})") if snap.get("ok") else ""),
-    ]
+    ] + [tr(k, e(v)) for k, v in report_rows(f.get("requirements") or {})]
     if any(rows):
         out.append(f'<h3 class="sec">Facts from the repository</h3><table class="facts">{"".join(rows)}</table>')
     narrative = r.get("narrative")

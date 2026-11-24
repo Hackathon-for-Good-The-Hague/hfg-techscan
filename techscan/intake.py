@@ -21,7 +21,7 @@ PR_NOTE = "Submitted link is a pull request"
 ANY_URL = re.compile(r"(?:https?://|(?<![\w.-])(?:www\.)?github\.com/)[^\s,;\"'<>]+", re.I)
 TEXT_COLUMNS = {"name", "project", "project name", "projectname", "team", "team name", "description", "punchline",
                 "tagline", "summary", "about", "demo", "video", "projecturl", "challenge", "track", "status",
-                "platform", "platform_url", "notes"}
+                "platform", "platform_url", "pr_url", "notes"}
 
 
 @dataclass
@@ -138,7 +138,7 @@ def read_submissions(path, cfg: dict) -> list:
         is_junction = "projecturl" in row or ("source" in row and "repo" not in row)
         project = _unescape(_first(row, "name", "project", "project name", "projectname", "team name", "team"))
         repo_field = _first(row, "source", "repo", "repository", "github", "repo url", "repository url", "code", "source code", "url")
-        pr_url = ""
+        pr_url = _first(row, "pr_url")
         m = PR_LINK.search(repo_field or "")
         if m:  # the repo part of a PR link is the challenge repo, not the team's code
             pr_url, repo_field = "https://" + m.group(0), ""
@@ -191,7 +191,7 @@ def read_submissions(path, cfg: dict) -> list:
             m = re.search(r"github\.com/[^/\s]+/[^/\s]+/tree/([^?#\s]+)", repo_field or "", re.I)
             if m:
                 sub.tree_path = m.group(1).strip("/")
-        elif pr_url:
+        elif pr_url and not _first(row, "pr_url"):
             sub.notes.append(f"{PR_NOTE} ({pr_url}); run 'pull' so it is resolved to the team's fork")
         else:
             sub.notes.append("No repository link found in the submission")

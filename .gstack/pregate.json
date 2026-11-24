@@ -13,10 +13,12 @@
       "tests/test_sources.py",
       "tests/test_cli_report.py",
       "tests/test_rubric_language.py",
-      "tests/test_branding.py"
+      "tests/test_branding.py",
+      "tests/test_requirements.py"
     ],
     "techscan/gitops.py": [
-      "tests/test_sources.py"
+      "tests/test_sources.py",
+      "tests/test_requirements.py"
     ],
     "techscan/__main__.py": [
       "tests/test_cli_report.py",
@@ -26,7 +28,8 @@
     "techscan/report.py": [
       "tests/test_cli_report.py",
       "tests/test_rubric_language.py",
-      "tests/test_branding.py"
+      "tests/test_branding.py",
+      "tests/test_requirements.py"
     ],
     ".github/workflows/selftest.yml": [],
     "config/examples/full.yaml": [],
@@ -35,10 +38,12 @@
       "tests/test_rubric_language.py"
     ],
     "techscan/pipeline.py": [
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_requirements.py"
     ],
     "techscan/pack.py": [
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_requirements.py"
     ],
     "prompts/review_system.md": [
       "tests/test_rubric_language.py"
@@ -50,13 +55,17 @@
       "tests/test_rubric_language.py"
     ],
     "config/onegov3.yaml": [
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_requirements.py"
     ],
     "techscan/branding.py": [
       "tests/test_branding.py"
     ],
     "techscan/observe.py": [
       "tests/test_branding.py"
+    ],
+    "techscan/requirements.py": [
+      "tests/test_requirements.py"
     ]
   }
 }

@@ -133,6 +133,11 @@ def load_config(path) -> dict:
                 raise ConfigError(f"challenges.{key}.brief file not found: {bp}")
             ch["brief_path"] = str(bp)
 
+    from .requirements import config_problems
+    problems = config_problems(cfg["challenges"])
+    if problems:
+        raise ConfigError(problems[0])
+
     for key, partner in cfg["partners"].items():
         for pat in partner.get("patterns", []):
             try:

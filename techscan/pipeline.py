@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from . import facts as F
+from . import requirements as R
 from .gitops import (GitHub, branch_from_tree_path, clone_or_update, commit_log, default_branch, git, history_patch,
                      other_branches, snapshot, summarize_activity)
 from .intake import match_challenge, read_submissions
@@ -152,6 +153,9 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
             return res
         if s.owner and gh.enabled:
             res["github"]["meta"] = gh.repo_meta(s.owner, s.repo)
+        pr = R.pr_from_url(s.pr_url)
+        if pr and gh.enabled and not gh.disabled_reason:
+            res["github"]["pr"] = gh.pr_status(*pr)
         ok, msg = clone_or_update(s.clone_url, dest)
         if not ok:
             _failed(res, "unreachable", msg)
@@ -259,6 +263,10 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
             r["facts"] = facts
             r["flags"] = F.build_flags(sub, r["snapshot"], r["github"], facts, sim,
                                        org=ev.get("github_org", ""), template=tmpl.get("url", ""))
+            rf = R.gather(inv, tmpl, sub, chal, r["github"])
+            if rf:
+                facts["requirements"] = rf
+                r["flags"] = R.apply_flags(r["flags"], rf, chal, r["snapshot"])
             if custom_checks:
                 from .checks import CheckContext, run_checks
                 ctx = CheckContext(submission=sub, snapshot=r["snapshot"], facts=facts,

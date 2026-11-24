@@ -22,7 +22,7 @@ from .intake import PR_NOTE, normalize_repo, read_submissions
 from .util import log
 
 COLUMNS = ["project", "repo", "challenge", "description", "punchline", "demo", "video", "team_size", "status",
-           "platform", "platform_url", "notes"]
+           "platform", "platform_url", "pr_url", "notes"]
 PR_URL = re.compile(r"github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/(\d+)", re.I)
 TEAM_NAME = re.compile(r"\bteam\s*name\s*\**\s*:\s*\**\s*([^*:\s].*)", re.I)
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
@@ -127,6 +127,7 @@ def pr_row(pr: dict, challenge: str) -> dict:
         "status": "draft PR" if pr.get("draft") else f"PR {pr.get('state', 'open')}",
         "platform": "GitHub PR",
         "platform_url": pr.get("html_url", ""),
+        "pr_url": pr.get("html_url", ""),
         "notes": " | ".join(notes),
     }
 
@@ -176,6 +177,7 @@ def resolve_pr_links(rows: list, gh, repo_challenges: dict = None) -> None:
         resolved = pr_row(pr, r.get("challenge", ""))
         r["repo"] = resolved["repo"]
         r["platform_url"] = r.get("platform_url") or resolved["platform_url"]
+        r["pr_url"] = resolved["pr_url"]
         r["notes"] = _join(r.get("notes"), resolved["notes"])
         if not r.get("challenge"):
             r["challenge"] = (repo_challenges or {}).get(f"{owner}/{repo}".lower(), "")
@@ -248,7 +250,8 @@ def merge_rows(groups: list, flag_missing: bool = True) -> list:
                 cur["_seen"].add(label)
                 if "/tree/" in (row["repo"] or "") and "/tree/" not in (cur["repo"] or ""):
                     cur["repo"] = row["repo"]  # the PR knows the branch, an Alkemio link may not
-                for c in ("project", "challenge", "punchline", "demo", "video", "team_size", "status", "platform_url"):
+                for c in ("project", "challenge", "punchline", "demo", "video", "team_size", "status", "platform_url",
+                          "pr_url"):
                     cur[c] = cur[c] or row[c]
                 if row["description"] and row["description"] not in cur["description"]:
                     cur["description"] = (f"{cur['description']}\n\n[{label}]\n{row['description']}"

@@ -125,6 +125,7 @@ class SourcesTest(unittest.TestCase):
         sloths = merged[0]
         self.assertEqual(sloths["project"], "Soevereine Sloths (Alkemio)")  # first source wins the name
         self.assertEqual(sloths["platform"], "Alkemio + GitHub PR")
+        self.assertTrue(sloths["pr_url"].endswith("/pull/7"))  # kept even though Alkemio wins the page link
         self.assertIn("From Alkemio", sloths["description"])
         self.assertIn("A classifier", sloths["description"])
         self.assertNotIn("Not found", sloths["notes"])

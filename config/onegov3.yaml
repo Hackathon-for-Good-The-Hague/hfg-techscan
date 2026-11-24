@@ -65,6 +65,15 @@ challenges:
     # judging criteria first: the brief is capped at review.brief_chars
     brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
     data_hints: ["classification.yaml", "patterns.yaml", "sources.yaml", "sovereignty", "soevereiniteit", "gibit"]
+    # Deterministic checks from docs/judging-criteria.md (evidence for the jury, never a verdict)
+    requirements:
+      team_work: [code, notebook, config, doc]   # rules in YAML and docs are team work here, not only code
+      open_licence: true      # M5: OSI licence for code, CC BY 4.0 / CC0 for rules and docs
+      tests: true             # hygiene: tests for the decision rules
+      explicit_rules: true    # M4 / X1: flag language-model calls; no classification by an LLM
+      submission_dir: "submissions/"
+      must_checklist: true    # ticked M1-M5 boxes in the PR template
+      pr_checks: true         # the repo's CI (lint, schema checks, tests) on the team's PR
   inferentie-netwerk:
     name: "Inferentie-netwerk"
     match: ["inferentie", "inference"]
@@ -72,6 +81,12 @@ challenges:
     # FILL IN once the repo has content (it is empty on 24 Nov)
     brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
     data_hints: []
+    # VERIFY against this challenge's judging criteria once published
+    requirements:
+      team_work: [code, notebook, config, doc]
+      open_licence: true
+      must_checklist: true
+      pr_checks: true
   # FILL IN: two more challenges are coming. Copy a block above and point template at the repo.
 
 # Partner tools to detect in code (regular expressions, case-insensitive).
