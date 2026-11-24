@@ -93,6 +93,13 @@ def cmd_preflight(cfg, args) -> int:
     for w in rubric_warnings:
         log(f"WARN {w}")
 
+    from .branding import check as check_branding
+    brand_warnings = check_branding(cfg.get("branding") or {})
+    for w in brand_warnings:
+        log(f"WARN {w}")
+    if cfg.get("branding") and not brand_warnings:
+        log("OK   Branding: colours, contrast and asset files")
+
     # Partner config summary
     partners = cfg.get("partners", {})
     if partners:
@@ -267,7 +274,10 @@ def cmd_challenge_report(cfg, args) -> int:
         subset = {s: r for s, r in results.items() if r["submission"].get("challenge") == key}
         if not subset:
             continue
-        html = challenge_owner_report(subset, challenge_key=key, event_name=cfg["event"]["name"])
+        from .branding import brand, dedash
+        b = brand(cfg)
+        html = challenge_owner_report(subset, challenge_key=key, event_name=cfg["event"]["name"], branding=b)
+        html = dedash(html) if b.get("no_em_dashes") else html
         out = Path(cfg["paths"]["output"]) / f"challenge-report-{key}.html"
         out.write_text(html, encoding="utf-8")
         log(f"  {out}")

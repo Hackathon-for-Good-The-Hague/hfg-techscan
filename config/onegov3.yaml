@@ -22,6 +22,30 @@ event:
   deadline: "2026-12-10T13:00:00+01:00"
   github_org: "govtechnl"
 
+# GovTechNL house style (onegov-design-kit/engine/brand.py). The kit is private, so its logos and fonts
+# are not copied into this repo: clone it next to the other govtechnl repos
+#   gh repo clone govtechnl/onegov-design-kit  (into C:/Users/<you>/repos/govtechnl/)
+# Missing files are left out of the pack; preflight warns about them.
+# Pink text on the blue cover fails contrast (1.7:1), so the cover follows the scorecard: light pink, blue text.
+branding:
+  primary: "#2C55A1"           # Figma "Blue"
+  accent: "#E52983"            # Figma "Dark Pink"
+  background: "#F9DAEA"        # Figma "Light Pink"
+  tint: "#FDEEF5"
+  highlight: "#FDEEF5"
+  cover_background: "#F9DAEA"
+  cover_text: "#2C55A1"
+  cover_accent: "#E52983"
+  font_family: "Figtree,'Segoe UI',Arial,sans-serif"   # Figtree stands in for Sofia Pro, as in the design kit
+  font_files:
+    400: ../../../govtechnl/onegov-design-kit/assets/fonts/Body-400.ttf
+    700: ../../../govtechnl/onegov-design-kit/assets/fonts/Body-700.ttf
+  logos:
+    - ../../../govtechnl/onegov-design-kit/assets/logos/onegov/series-lockup-small.png   # blue text; the "-blue" wordmark is white text for blue backgrounds
+    - ../../../govtechnl/onegov-design-kit/assets/logos/govtechnl/logo.png
+  footer: "OneGov AI Hackathon Series · GovTechNL · technische review door TechScan (Hackathon OS)"
+  no_em_dashes: true
+
 # Teams fork the challenge repo and open one PR each (work under submissions/<team>/).
 # github-prs reads each challenge's template repo below. Alkemio comes first so its team names win.
 sources:

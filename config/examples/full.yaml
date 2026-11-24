@@ -114,6 +114,25 @@ scan:
   # See config/examples/checks/ for examples.
   custom_checks_dir: ""                      # e.g. ./checks (relative to this config file)
 
+# ── Branding (optional) ──────────────────────────────────────────────────────
+# Colours, font and logos for the jury pack, scorecard header and challenge reports.
+# Leave out for the default look. Logo and font paths are relative to this file and embedded in the pack.
+# Preflight checks the contrast of each colour pair and warns about missing files.
+# branding:
+#   primary: "#2C55A1"            # cover, links, score badge, bars, headings
+#   accent: "#E52983"             # highlight borders, event name on the cover
+#   background: "#F9DAEA"         # page background (team cards stay white)
+#   tint: "#FDEEF5"               # table headers and chips
+#   highlight: "#FDEEF5"          # the "questions to ask" box
+#   cover_background: "#F9DAEA"   # default: primary
+#   cover_text: "#2C55A1"         # default: white
+#   cover_accent: "#E52983"       # default: accent
+#   font_family: "Figtree,'Segoe UI',Arial,sans-serif"
+#   font_files: {400: fonts/Regular.ttf, 700: fonts/Bold.ttf}
+#   logos: [logos/series.png, logos/org.png]
+#   footer: "My Hackathon · technical review by TechScan"
+#   no_em_dashes: true            # house style: replace em dashes in all output
+
 # ── Platform Integration (optional) ─────────────────────────────────────────
 # Where submissions come from. 'scan' without -s pulls from these (or run 'pull' to check the CSV first).
 # Earlier sources win for team name and links; rows pointing at the same GitHub repo become one team,

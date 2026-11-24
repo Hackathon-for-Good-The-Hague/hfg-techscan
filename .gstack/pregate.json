@@ -12,18 +12,21 @@
     "techscan/config.py": [
       "tests/test_sources.py",
       "tests/test_cli_report.py",
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_branding.py"
     ],
     "techscan/gitops.py": [
       "tests/test_sources.py"
     ],
     "techscan/__main__.py": [
       "tests/test_cli_report.py",
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_branding.py"
     ],
     "techscan/report.py": [
       "tests/test_cli_report.py",
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_branding.py"
     ],
     ".github/workflows/selftest.yml": [],
     "config/examples/full.yaml": [],
@@ -48,6 +51,12 @@
     ],
     "config/onegov3.yaml": [
       "tests/test_rubric_language.py"
+    ],
+    "techscan/branding.py": [
+      "tests/test_branding.py"
+    ],
+    "techscan/observe.py": [
+      "tests/test_branding.py"
     ]
   }
 }

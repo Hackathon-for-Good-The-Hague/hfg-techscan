@@ -497,6 +497,7 @@ def challenge_owner_report(
     challenge_key: str = "",
     partner_key: str = "",
     event_name: str = "Hackathon for Good",
+    branding: dict = None,
 ) -> str:
     """Generate an HTML report for challenge partners.
 
@@ -514,6 +515,8 @@ def challenge_owner_report(
         If set, highlight teams using this partner's technology.
     event_name : str
         Name of the event for the report header.
+    branding : dict
+        Resolved branding (techscan.branding.brand); defaults to the HFG colours.
 
     Returns
     -------
@@ -596,6 +599,8 @@ def challenge_owner_report(
     rows.sort(key=lambda r: (not r["used_partner"], -r["commits"]))
 
     # build HTML
+    primary = (branding or {}).get("primary", "#1962A1")
+    accent = (branding or {}).get("accent", "#FCCD02")
     parts = [
         "<!DOCTYPE html>",
         "<html lang='en'><head><meta charset='utf-8'>",
@@ -603,10 +608,10 @@ def challenge_owner_report(
         "<style>",
         "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; "
         "       max-width: 1100px; margin: 2em auto; padding: 0 1em; color: #1a1a1a; }",
-        "h1 { color: #1962A1; } h2 { color: #333; border-bottom: 2px solid #FCCD02; padding-bottom: .3em; }",
+        f"h1 {{ color: {primary}; }} h2 {{ color: #333; border-bottom: 2px solid {accent}; padding-bottom: .3em; }}",
         "table { border-collapse: collapse; width: 100%; margin: 1em 0; }",
         "th, td { border: 1px solid #ddd; padding: .5em .7em; text-align: left; font-size: .9em; }",
-        "th { background: #1962A1; color: white; }",
+        f"th {{ background: {primary}; color: white; }}",
         "tr:nth-child(even) { background: #f8f9fa; }",
         ".yes { color: #2E7D32; font-weight: bold; } .no { color: #999; }",
         ".tag { display: inline-block; background: #e8f0fe; padding: .1em .4em; border-radius: 3px; "

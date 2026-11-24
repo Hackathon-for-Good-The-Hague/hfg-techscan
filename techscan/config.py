@@ -60,6 +60,8 @@ DEFAULTS = {
         "extra_secret_patterns": [],
         "custom_checks_dir": "",
     },
+    # colours, fonts and logos for the jury pack (see techscan/branding.py for every key and its default)
+    "branding": {},
     # where submissions come from, in priority order (see techscan/sources.py); empty = pass -s <csv>
     "sources": [],
     "junction": {
@@ -166,6 +168,14 @@ def load_config(path) -> dict:
         rv["workers"] = max(1, int(rv["workers"]))
     except (TypeError, ValueError) as e:
         raise ConfigError(f"review.workers must be a number, got {rv['workers']!r}") from e
+
+    from .branding import check as check_branding, resolve_paths
+    if not isinstance(cfg.get("branding"), dict):
+        raise ConfigError("branding must be a mapping, e.g. {primary: '#2C55A1', accent: '#E52983'}")
+    resolve_paths(cfg["branding"], base)
+    bad = [m for m in check_branding(cfg["branding"]) if m.startswith("branding.")]
+    if bad:
+        raise ConfigError(bad[0])
 
     cfg["paths"]["workdir"] = str((base / cfg["paths"]["workdir"]).resolve())
     cfg["paths"]["output"] = str((base / cfg["paths"]["output"]).resolve())
