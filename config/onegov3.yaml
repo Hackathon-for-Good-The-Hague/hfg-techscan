@@ -149,8 +149,9 @@ review:
   backend: claude-cli
   model: claude-sonnet-4-6
   # backend: greenpt
-  # model: ""              # FILL IN from preflight --ping once GreenPT provides a key
-  # budget_chars: 200000
+  # model: glm-5.3         # tested 26 Nov on a OneGov #2 team against Claude: comparable review, 0 invalid
+  #                        # citations, ~2 min. kimi-k3.1-pro also good but ~3.5 min (needs max_output_tokens 32000);
+  #                        # mistral-medium-3.5-128b miscounted and asked generic questions.
   # Parallel reviews. About 2.5 minutes per team: 4 workers do 20 changed teams in about 13 minutes.
   workers: 4
   # AI-written text (summaries, claims, jury questions) in Dutch; fixed labels stay English

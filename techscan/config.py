@@ -38,7 +38,8 @@ DEFAULTS = {
         # greenpt / openai-compatible only: API root, the env var holding the key, and json output mode
         "api_base": "",          # greenpt default: https://api.greenpt.ai/v1
         "api_key_env": "",       # greenpt default: GREENPT_API_KEY; openai-compatible: OPENAI_API_KEY
-        "response_format": "",   # json_schema (default) | json_object | text; steps down automatically  # language of the AI-written text in the jury pack: en, nl, de, fr
+        "response_format": "",   # json_schema (default) | json_object | text; steps down automatically
+        "max_output_tokens": 0,  # 0 = 16000; reasoning models need more because hidden thinking counts  # language of the AI-written text in the jury pack: en, nl, de, fr
     },
     "rubric": {
         "show_scores_to_jury": False,  # when False, jury packs show evidence/claims/flags but not AI scores

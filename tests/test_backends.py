@@ -41,6 +41,9 @@ class FakeAPI(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         FakeAPI.requests.append({"auth": self.headers.get("Authorization"), **body})
+        if body.get("max_tokens", 0) > 16384:
+            return self._send(400, {"error": {"message": "400 payload validation: max_completion_tokens is limited to "
+                                                         "16384 for eu-large"}})
         fmt = (body.get("response_format") or {}).get("type")
         if fmt == "json_schema" and FakeAPI.reject_schema:
             return self._send(400, {"error": {"message": "response_format json_schema is not supported"}})
@@ -93,6 +96,14 @@ class OpenAICompatibleTest(unittest.TestCase):
         self.assertEqual(meta["response_format"], "json_object")
         self.assertEqual([(r.get("response_format") or {}).get("type") for r in FakeAPI.requests],
                          ["json_schema", "json_object"])
+
+    def test_retries_with_the_servers_output_token_limit(self):
+        cfg = cfg_for("greenpt", self.port)
+        cfg["review"]["max_output_tokens"] = 32000
+        b = make_backend(cfg)
+        review, _ = b.review("sys", "user", Path("."))
+        self.assertEqual(review["summary"], "Werkt.")
+        self.assertEqual([r["max_tokens"] for r in FakeAPI.requests], [32000, 16384])
 
     def test_ping_lists_models_when_the_model_is_wrong(self):
         self.assertEqual(make_backend(cfg_for("greenpt", self.port)).ping(), "")

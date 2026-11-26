@@ -73,6 +73,9 @@
     ],
     "tests/test_requirements.py": [
       "tests/test_requirements.py"
+    ],
+    "tests/test_backends.py": [
+      "tests/test_backends.py"
     ]
   }
 }

@@ -453,6 +453,7 @@ class OpenAICompatible:
         self.timeout = int(rv["timeout_minutes"]) * 60
         self.schema = build_schema(cfg)
         self.mode = rv.get("response_format") or "json_schema"
+        self.max_tokens = int(rv.get("max_output_tokens") or 16000)
 
     def problem(self) -> str:
         if not self.base:
@@ -511,7 +512,7 @@ class OpenAICompatible:
         if deep:
             raise ReviewError(f"Deep mode is only available with the claude-cli backend, not {self.name}")
         while True:
-            body = {"model": self.model, "temperature": 0, "max_tokens": 8000,
+            body = {"model": self.model, "temperature": 0, "max_tokens": self.max_tokens,
                     "messages": [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]}
             fmt = self._response_format()
             if fmt:
@@ -522,12 +523,18 @@ class OpenAICompatible:
                 log(f"  {self.name}: '{self.mode}' output not supported, falling back to '{nxt}'")
                 self.mode = nxt
                 continue
+            cap = re.search(r"(?i)(?:max_tokens|max_completion_tokens|completion tokens)\D{0,40}?(?:limited to|at most|<=?|maximum(?: is)?)\s*(\d{3,6})", err or "")
+            if data is None and status in (400, 422) and cap and int(cap.group(1)) < self.max_tokens:
+                log(f"  {self.name}: {self.model} allows at most {cap.group(1)} output tokens, retrying with that")
+                self.max_tokens = int(cap.group(1))
+                continue
             break
         if data is None:
             raise ReviewError(err)
         choice = (data.get("choices") or [{}])[0]
         if choice.get("finish_reason") == "length":
-            raise ReviewError("The review was cut off (max_tokens). Lower review.budget_chars or use a larger model.")
+            raise ReviewError(f"The model ran out of output tokens ({self.max_tokens}) before finishing the review. "
+                              "Reasoning models spend tokens on hidden thinking: raise review.max_output_tokens.")
         review = extract_json((choice.get("message") or {}).get("content") or "")
         if not isinstance(review, dict):
             raise ReviewError(f"{self.name} returned no review JSON")
