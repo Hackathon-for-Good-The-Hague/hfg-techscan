@@ -48,7 +48,8 @@ class RequirementFactsTest(unittest.TestCase):
             "submissions/sloths/explain.py": "from openai import OpenAI\nclient = OpenAI()\n",
             "submissions/sloths/NOTES.md": "Our approach\n\nMore text\n",
         }, template={"LICENSE", "LICENSE-DATA", "README.md", "tooling/tests/test_starter.py"})
-        self.rf = R.gather(self.inv, {}, {"description": PR_BODY}, {"requirements": REQ},
+        self.rf = R.gather(self.inv, {}, {"description": PR_BODY, "pr_url": "https://github.com/o/r/pull/7"},
+                           {"requirements": REQ},
                            {"pr": {"summary": "failed", "head_sha": "abcdef1234",
                                    "checks": [{"name": "validate", "status": "completed", "conclusion": "failure"}]}})
 
@@ -93,6 +94,21 @@ class RequirementFactsTest(unittest.TestCase):
         self.assertEqual(R.apply_flags(no_code_flag(), {}, {}, {}), no_code_flag())
         self.assertEqual(R.pack_summary({}), {})
         self.assertEqual(R.report_rows({}), [])
+
+    def test_pr_checks_only_for_teams_with_a_pr_and_folder_only_on_the_starter(self):
+        own_repo = inventory({"LICENSE": APACHE, "app.py": "print(1)\n"})  # the team's own repo, no PR
+        rf = R.gather(own_repo, {}, {"description": ""}, {"requirements": REQ}, {})
+        self.assertNotIn("must_checklist", rf)
+        self.assertNotIn("pr_checks", rf)
+        self.assertNotIn("submission_dir", rf)
+        codes = {f["code"] for f in R.apply_flags([], rf, {"requirements": REQ}, {})}
+        self.assertFalse(codes & {"no_must_checklist", "pr_checks_none", "outside_submission_dir"})
+
+    def test_challenge_specific_llm_rule(self):
+        req = {"explicit_rules": "A model must not decide the SEAL level."}
+        flags = R.apply_flags([], {"llm_calls": [{"file": "a.py", "line": 1, "text": "import openai"}]},
+                              {"requirements": req}, {})
+        self.assertEqual(flags[0]["detail"], "A model must not decide the SEAL level.")
 
     def test_awaiting_approval_is_explained(self):
         rf = {"pr_checks": {"summary": "awaiting approval"}}

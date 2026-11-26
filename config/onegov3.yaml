@@ -1,25 +1,35 @@
-# OneGov AI Hackathon Series, Editie #3 (GovTechNL), 9-10 December 2026, The Hague Tech
-# Lines marked FILL IN or VERIFY need your input before the event. Times need a UTC offset (+01:00 in December).
+# OneGov Hackathon Series, Editie #3 (GovTechNL), 9-10 December 2026, The Hague Tech
+# Source for times, challenges and judging: EVENT.md and docs/judging-criteria.md in the four challenge repos
+# (checked 26 Nov). Lines marked FILL IN still need input.
 #
-# Event day (jury Ronde 1 at 14:00, deadline 13:00): run the scan at 11:00 and 12:00 as well.
-# Reviews are cached per team input, so the 13:00 run only re-reviews teams that pushed since.
+# Event day, 10 December. The deadline (14:00) is also when the first-round pitches and the technical jury
+# start, so there is no gap: warm the review cache beforehand. Reviews are cached per team input, so a
+# later run only re-reviews teams that pushed since the previous one.
+#   12:00  python -m techscan scan -c config/onegov3.yaml        (all teams, full review)
+#   13:30  python -m techscan scan -c config/onegov3.yaml        (only changed teams)
+#   14:00  python -m techscan scan -c config/onegov3.yaml        (final: code frozen at 14:00, changed teams only)
+# Before the event:
 #   python -m techscan preflight -c config/onegov3.yaml --ping
-#   python -m techscan pull -c config/onegov3.yaml        # check the merged CSV
-#   python -m techscan scan -c config/onegov3.yaml
+#   python -m techscan pull -c config/onegov3.yaml               (check the merged CSV)
 
 event:
-  name: "OneGov AI Hackathon Series - Editie #3"
+  name: "OneGov Hackathon Series - Editie #3"
   short_name: "OneGov #3"
   context: >-
     OneGov is the GovTechNL hackathon series where civil servants, developers and partners build open,
     reusable solutions for Dutch government. Theme of this edition: digital autonomy and sovereignty
-    (digitale autonomie en soevereiniteit). Teams fork the challenge repository and submit one pull request
-    each; code must be open source.
-  build_time: "about a day and a half of building (9 December and the morning of 10 December)"
-  # VERIFY: kickoff time. Commits dated more than 2 hours before this get flagged.
+    (digitale autonomie en soevereiniteit). The submission is the team's Alkemio entry, linking a public
+    GitHub repository (a fork of the starter repository or the team's own) with an open-source licence and a
+    README that says how to run the work; a pull request into the starter repository is optional. Each
+    challenge has Must criteria that are pass or fail. The technical jury checks: is the repository public
+    with an open-source licence, is the code readable with a clear README, can someone else reproduce it,
+    are assumptions documented, and is it clear what is simulated.
+  build_time: "about a day and a half of building (9 December 09:40 to 20:00, and 10 December 08:30 to the 14:00 deadline)"
+  # Kick-off on the main stage; hacking starts 09:40. Commits dated more than 2 hours before this get flagged
+  # (teams formed at the pre-hackathon on 26 Nov, so early repos are possible: the flag says to ask).
   start: "2026-12-09T09:00:00+01:00"
-  # VERIFY: submission deadline (13:00 per the organisers). The scan reviews the last commit before this moment.
-  deadline: "2026-12-10T13:00:00+01:00"
+  # Submission deadline in Alkemio. The scan reviews the last commit before this moment.
+  deadline: "2026-12-10T14:00:00+01:00"
   github_org: "govtechnl"
 
 # GovTechNL house style (onegov-design-kit/engine/brand.py). The kit is private, so its logos and fonts
@@ -43,53 +53,86 @@ branding:
   logos:
     - ../../../govtechnl/onegov-design-kit/assets/logos/onegov/series-lockup-small.png   # blue text; the "-blue" wordmark is white text for blue backgrounds
     - ../../../govtechnl/onegov-design-kit/assets/logos/govtechnl/logo.png
-  footer: "OneGov AI Hackathon Series · GovTechNL · technische review door TechScan (Hackathon OS)"
+  footer: "OneGov Hackathon Series · GovTechNL · technische review door TechScan (Hackathon OS)"
   no_em_dashes: true
 
-# Teams fork the challenge repo and open one PR each (work under submissions/<team>/).
-# github-prs reads each challenge's template repo below. Alkemio comes first so its team names win.
+# The Alkemio entry is the submission; a PR into a starter repo is optional. Until the Alkemio source is set
+# up, only teams that opened a PR are found: teams working in their own repo are missed.
 sources:
-  # FILL IN when the Alkemio adapter or an Alkemio export is ready (columns: project, repo, challenge).
-  # A repo link or a pull request link in the Alkemio post is resolved to the team's fork and branch.
+  # FILL IN next week: the Alkemio adapter, or meanwhile an Alkemio export (columns: project, repo, challenge).
+  # A repo link or a pull request link in the Alkemio entry is resolved to the team's repo and branch.
+  # Alkemio comes first so its team names win when a team is found in both.
   # - type: csv
   #   path: ../alkemio-onegov3.csv
   #   label: Alkemio
   - type: github-prs
     exclude_authors: ["dependabot[bot]"]
 
+# Four challenges (EVENT.md). match: words that identify the challenge in the platform's challenge field.
+# brief_files: judging criteria first, because the brief is capped at review.brief_chars.
+# requirements: deterministic checks taken from each docs/judging-criteria.md (evidence, never a verdict).
+# Must-box and CI checks only apply to teams that opened a PR; submission_dir only to forks of the starter.
 challenges:
-  inkooptafel:
-    name: "Van classificatie naar inkooptafel"
-    match: ["inkooptafel", "inkoop", "procurement", "classificatie"]
-    template: "https://github.com/govtechnl/onegov3-inkooptafel.git"
-    # judging criteria first: the brief is capped at review.brief_chars
-    brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
-    data_hints: ["classification.yaml", "patterns.yaml", "sources.yaml", "sovereignty", "soevereiniteit", "gibit"]
-    # Deterministic checks from docs/judging-criteria.md (evidence for the jury, never a verdict)
-    requirements:
-      team_work: [code, notebook, config, doc]   # rules in YAML and docs are team work here, not only code
-      open_licence: true      # M5: OSI licence for code, CC BY 4.0 / CC0 for rules and docs
-      tests: true             # hygiene: tests for the decision rules
-      explicit_rules: true    # M4 / X1: flag language-model calls; no classification by an LLM
-      submission_dir: "submissions/"
-      must_checklist: true    # ticked M1-M5 boxes in the PR template
-      pr_checks: true         # the repo's CI (lint, schema checks, tests) on the team's PR
   inferentie-netwerk:
-    name: "Inferentie-netwerk"
+    name: "Overheid Inferentie Netwerk"
     match: ["inferentie", "inference"]
     template: "https://github.com/govtechnl/onegov3-inferentie-netwerk.git"
-    # FILL IN once the repo has content (it is empty on 24 Nov)
     brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
-    data_hints: []
-    # VERIFY against this challenge's judging criteria once published
+    data_hints: ["network.yaml", "policy.yaml", "scenarios.yaml", "werkdag.csv", "market-mock", "routing",
+                 "settlement", "gateway", "litellm"]
+    requirements:
+      team_work: [code, notebook, config, doc]   # routing rules in config and a governance design count
+      open_licence: true      # M5
+      submission_dir: "submissions/"
+      must_checklist: true    # M1-M5 boxes in the PR template
+      pr_checks: true
+      # no explicit_rules: AI gateways and model calls are the subject of this challenge
+  inkooptafel:
+    name: "Van beleid naar inkooptafel"
+    match: ["inkooptafel", "inkoop", "procurement", "seal"]
+    template: "https://github.com/govtechnl/onegov3-inkooptafel.git"
+    brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
+    data_hints: ["toets.yaml", "sources.yaml", "requirements", "selectie", "seal", "scope", "tenderned", "advies"]
+    requirements:
+      team_work: [code, notebook, config, doc]   # selection rules in YAML and docs are team work
+      open_licence: true      # M5
+      tests: true             # rules-as-code should be testable (X5)
+      explicit_rules: >-
+        M4 and X1: a language model must not decide the SEAL level, the classification or the selection of
+        requirements. Using a model to find candidate requirements in sources is fine. Ask what the model decides.
+      submission_dir: "submissions/"
+      must_checklist: true    # note: the PR template's M1-M3 still describe the older classification task
+      pr_checks: true
+  synthpop-py:
+    name: "synthpop.py"
+    match: ["synthpop", "synthetic", "synthetisch", "duo"]
+    template: "https://github.com/govtechnl/onegov3-synthpop-py.git"
+    brief_files: ["docs/judging-criteria.md", "CHALLENGE.md", "docs/business-rules.md"]
+    data_hints: ["synthpop", "rulecheck", "evaluate.py", "synthetic_homicide", "spmse", "s_pmse",
+                 "special_syn_method", "column_order", "2834727"]
     requirements:
       team_work: [code, notebook, config, doc]
-      open_licence: true
-      must_checklist: true
+      open_licence: true      # M4 (code licence; this repo also ships LICENSE-DATA)
+      tests: true             # C4: a contribution with tests
+      pr_checks: true         # ci.yml; no Must boxes in this PR template and no submissions/ folder
+  open-algoritme:
+    name: "Open Algoritme"
+    match: ["open algoritme", "algoritme", "gezag", "motivering"]
+    template: "https://github.com/govtechnl/onegov3-open-algoritme.git"
+    brief_files: ["docs/judging-criteria.md", "CHALLENGE.md"]
+    data_hints: ["rvig-gezag", "scenarios.json", "gezag", "algoritmeregister", "reisdocument-minderjarige",
+                 "motivering", "openalgoritme", "uitleg"]
+    requirements:
+      team_work: [code, notebook, config, doc]   # templates and explanation texts are the deliverable
+      open_licence: true      # M4: OSI for code, CC BY 4.0 / CC0 for texts and templates
+      tests: true
+      submission_dir: "submissions/"
+      must_checklist: true    # M1-M4 boxes in the PR template
       pr_checks: true
-  # FILL IN: two more challenges are coming. Copy a block above and point template at the repo.
+      # no explicit_rules: a model may draft the motivering (C2 even invites a chatbot); the AI review judges
+      # traceability (S1, S4) against the brief
 
-# Partner tools to detect in code (regular expressions, case-insensitive).
+# Partner tools to detect in code (regular expressions, case-insensitive). GreenPT has a bonus prize.
 partners:
   greenpt:
     label: "GreenPT"
@@ -106,14 +149,15 @@ review:
   backend: claude-cli
   model: claude-sonnet-4-6
   # backend: greenpt
-  # model: ""              # FILL IN from preflight --ping, e.g. a large instruction model
+  # model: ""              # FILL IN from preflight --ping once GreenPT provides a key
   # budget_chars: 200000
+  # Parallel reviews. About 2.5 minutes per team: 4 workers do 20 changed teams in about 13 minutes.
   workers: 4
   # AI-written text (summaries, claims, jury questions) in Dutch; fixed labels stay English
   language: nl
   budget_chars: 400000
   max_file_chars: 40000
-  brief_chars: 20000
+  brief_chars: 26000       # the largest brief (judging criteria + CHALLENGE.md) is about 23,000 characters
   timeout_minutes: 15
   claude_path: ""
   effort: ""
@@ -121,6 +165,7 @@ review:
 
 # Scorekaart Ronde 1 (challenge owners and technical jury, 10 Dec 14:00): six criteria, 1-5, total /30.
 # The Finale card swaps Technische kwaliteit for Presentatie, which the code cannot show; use Ronde 1 here.
+# Scores stay hidden in the jury pack; the jury scores on paper.
 rubric:
   show_scores_to_jury: false
   max_score: 5
@@ -149,7 +194,7 @@ rubric:
     technisch:
       label: "Technische kwaliteit"
       weight: 1
-      description: "Werkt het, is de repository bruikbaar? (Does it work, and can someone clone and run the repository?)"
+      description: "Werkt het, is de repository bruikbaar? The technical jury's checks: public repository with an open-source licence, readable code with a clear README, reproducible by someone else, assumptions documented, and clear what is simulated."
 
 scan:
   pre_event_grace_hours: 2

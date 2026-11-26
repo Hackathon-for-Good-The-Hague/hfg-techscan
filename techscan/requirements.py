@@ -10,9 +10,14 @@ but every check is generic. Nothing runs unless the challenge has a `requirement
         open_licence: true              # an OSI licence for the code and an open licence (CC BY / CC0) for docs
         tests: true                     # the team added tests (starter-repo tests do not count)
         explicit_rules: true            # flag language-model calls: decisions must not hide in a prompt
+                                        # (or a sentence: the challenge's own rule, shown as the flag's detail)
         submission_dir: "submissions/"  # team work belongs under this folder
         must_checklist: true            # read the ticked Must boxes (- [x] **M1** ...) from the PR description
         pr_checks: true                 # CI result of the team's pull request
+
+A pull request can be optional (the platform entry is the submission, the repo may be the team's own): the
+checklist and CI checks then only apply to teams that opened one, and submission_dir only to repos built on
+the starter repository.
 
 Every result is evidence for the jury, never a verdict: each flag says what to ask.
 """
@@ -168,12 +173,14 @@ def gather(inv, template: dict, sub: dict, challenge: dict, github: dict) -> dic
         out["team_tests"] = sorted(f["path"] for f in inv.files if _team(f) and TEST_RE.search(f["path"]))[:20]
     if req.get("explicit_rules"):
         out["llm_calls"] = llm_calls(inv)
-    if req.get("submission_dir"):
+    on_starter = any(f["status"] in ("template", "template-modified") for f in inv.files)
+    if req.get("submission_dir") and on_starter:
         out["submission_dir"] = submission_dir(inv, req["submission_dir"])
-    if req.get("must_checklist"):
+    has_pr = bool(sub.get("pr_url"))
+    if req.get("must_checklist") and has_pr:
         out["must_checklist"] = must_checklist(sub.get("description", ""))
-    if req.get("pr_checks"):
-        out["pr_checks"] = (github or {}).get("pr") or {"summary": "no pull request"}
+    if req.get("pr_checks") and has_pr:
+        out["pr_checks"] = (github or {}).get("pr") or {"summary": "unknown"}
     return out
 
 
@@ -226,6 +233,7 @@ def apply_flags(flags: list, rf: dict, challenge: dict, snap: dict) -> list:
         files = sorted({c["file"] for c in calls})
         add("llm_in_code", "medium",
             f"Calls a language model ({len(calls)} place(s) in {len(files)} file(s)): check what it decides",
+            req["explicit_rules"] if isinstance(req.get("explicit_rules"), str) else
             "The brief asks for decision rules in code or configuration, not in a prompt. Fine for explaining or "
             "drafting text; not fine if the model makes the classification or advice.",
             [{"file": c["file"], "lines": str(c["line"])} for c in calls[:5]])

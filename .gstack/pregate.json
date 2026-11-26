@@ -70,6 +70,9 @@
     ],
     "techscan/requirements.py": [
       "tests/test_requirements.py"
+    ],
+    "tests/test_requirements.py": [
+      "tests/test_requirements.py"
     ]
   }
 }
