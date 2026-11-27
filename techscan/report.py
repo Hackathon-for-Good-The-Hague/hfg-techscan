@@ -10,9 +10,10 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from .gitops import blob_url
+from .requirements import report_rows
+from .branding import brand, dedash, logos_html, theme_css, xlsx_hex
 from .util import fmt_dt, log, parse_dt, read_json, truncate, write_json
 
-BLUE, YELLOW = "1962A1", "FCCD02"
 SCORE_FILL_5 = {1: "F4B6B6", 2: "F9D9C4", 3: "FFF2CC", 4: "DDEFD5", 5: "B9E0A5"}
 SCORE_FILL_10 = {1: "F4B6B6", 2: "F4B6B6", 3: "F9D9C4", 4: "F9D9C4", 5: "FFF2CC",
                  6: "FFF2CC", 7: "DDEFD5", 8: "DDEFD5", 9: "B9E0A5", 10: "B9E0A5"}
@@ -124,10 +125,20 @@ def _append(ws, row: list) -> None:
             c.data_type = "s"
 
 
+def _dedash_workbook(wb, cfg: dict) -> None:
+    if not brand(cfg).get("no_em_dashes"):
+        return
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                if isinstance(c.value, str) and "\u2014" in c.value:
+                    c.value = dedash(c.value)
+
+
 def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
     wb = Workbook()
     hdr_font = Font(name="Calibri", bold=True, color="FFFFFF")
-    hdr_fill = PatternFill("solid", fgColor=BLUE)
+    hdr_fill = PatternFill("solid", fgColor=xlsx_hex(brand(cfg)["primary"]))
     thin = Side(style="thin", color="D9D9D9")
     border = Border(bottom=thin)
     wrap = Alignment(wrap_text=True, vertical="top")
@@ -191,7 +202,7 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
         ]
         if show_scores:
             row = ([sub["project"], chal, round(weighted, 1) if weighted else None] + crit_scores +
-                   [rv.get("technical_score"), rv.get("confidence", ""), _score_summary(r)] + common_cols)
+                   [rv.get("technical_score"), rv.get("confidence", ""), _score_summary(r, rubric.get("max_score", 10))] + common_cols)
         else:
             row = [sub["project"], chal] + common_cols
         _append(ws, row)
@@ -205,10 +216,11 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
                 ws.cell(row=i, column=3).fill = PatternFill("solid", fgColor=SCORE_FILL_10[bucket])
                 ws.cell(row=i, column=3).font = Font(name="Calibri", bold=True)
         # Color each criterion score cell
+        fills = SCORE_FILL_5 if rubric.get("max_score", 10) <= 5 else SCORE_FILL_10
         for ci, k in enumerate(criteria):
             v = scores.get(k)
-            if v and v in SCORE_FILL_10:
-                ws.cell(row=i, column=4 + ci).fill = PatternFill("solid", fgColor=SCORE_FILL_10[v])
+            if v and v in fills:
+                ws.cell(row=i, column=4 + ci).fill = PatternFill("solid", fgColor=fills[v])
         # Repo hyperlink (column shifts with dynamic criteria)
         repo_col = 4 + len(criteria) + 18  # after criteria + fixed columns
         if sub.get("repo_url", "").startswith("http"):
@@ -271,8 +283,12 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
     about = [
         ("What this is", "Advisory technical evidence for the jury. It does not pick winners. Humans decide."),
         ("Snapshot", f"Last commit on each team's main branch before the deadline ({run.get('deadline', '')})."),
-        ("Tech score", "1 = little working code, 2 = mostly UI or mocked, 3 = narrow but real, "
-                       "4 = working end to end, 5 = exceptional for the time. Covers technical execution only."),
+        ("Tech score", ("1 = little working code, 2 = mostly UI or mocked, 3 = narrow but real, "
+                        "4 = working end to end, 5 = exceptional for the time."
+                        if (cfg.get("rubric") or {}).get("max_score", 10) <= 5 else
+                        "1-2 = little working code, 3-4 = mostly UI or mocked, 5-6 = narrow but real, "
+                        "7-8 = working end to end, 9-10 = exceptional for the time.")
+                       + " Covers technical execution only."),
         ("Flags", "Scanner flags come from fixed checks (no AI). AI review flags come from reading the code. "
                   "Both can have innocent explanations: ask the team."),
         ("Review engine", f"{run.get('backend', '')} / {run.get('model', '')}"),
@@ -285,6 +301,7 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
         ws6.cell(row=ws6.max_row, column=2).alignment = wrap
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        _dedash_workbook(wb, cfg)
         wb.save(path)
     except PermissionError:  # usually: the file is open in Excel
         from datetime import datetime
@@ -298,42 +315,44 @@ def write_xlsx(path: Path, cfg: dict, run: dict, results: dict) -> Path:
 # ------------------------------------------------------------------ HTML
 
 CSS = """
-*{box-sizing:border-box}body{font-family:Calibri,'Segoe UI',Arial,sans-serif;color:#1f2937;margin:0;background:#f4f6f9;font-size:15px;line-height:1.45}
-a{color:#1962A1}.wrap{max-width:980px;margin:0 auto;padding:24px}
-.cover{background:#1962A1;color:#fff;padding:32px 24px}.cover .wrap{padding:0 24px}.brand{font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:13px;color:#FCCD02}
+*{box-sizing:border-box}body{font-family:var(--font);color:#1f2937;margin:0;background:var(--bg);font-size:15px;line-height:1.45}
+a{color:var(--primary)}.wrap{max-width:980px;margin:0 auto;padding:24px}
+.cover{background:var(--cover-bg);color:var(--cover-text);padding:32px 24px}.cover .wrap{padding:0 24px;display:flex;justify-content:space-between;align-items:center;gap:24px}
+.logos{display:flex;gap:18px;align-items:center;flex-shrink:0}.logos img{max-height:64px;max-width:200px}
+.footer{margin:28px 0 8px;text-align:center}.brand{font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:13px;color:var(--cover-accent)}
 .cover h1{margin:6px 0 4px;font-size:30px}.cover p{margin:0;opacity:.9}
-.howto{background:#fff;border-left:6px solid #FCCD02;padding:14px 18px;margin:20px 0;border-radius:6px}
+.howto{background:#fff;border-left:6px solid var(--accent);padding:14px 18px;margin:20px 0;border-radius:6px}
 .howto p{margin:4px 0}
 table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid #e5e7eb}
-th{background:#eef3f9;font-size:13px;color:#374151}
+th{background:var(--tint);font-size:13px;color:#374151}
 .summary td.score,.summary th.score{text-align:center;width:70px}
 .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
-.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:#eef3f9;color:#1962A1;margin-right:4px;white-space:nowrap}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:var(--tint);color:var(--primary);margin-right:4px;white-space:nowrap}
 .team{background:#fff;border-radius:10px;padding:22px 24px;margin:22px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .team h2{margin:0 0 6px;font-size:24px}.links a{margin-right:14px;font-size:14px}
 .top{display:flex;gap:18px;align-items:flex-start;margin:14px 0}
-.badge{min-width:96px;text-align:center;border-radius:12px;padding:10px 6px;background:#1962A1;color:#fff}
+.badge{min-width:96px;text-align:center;border-radius:12px;padding:10px 6px;background:var(--primary);color:#fff}
 .badge .n{font-size:40px;font-weight:700;line-height:1}.badge .l{font-size:12px;opacity:.9}
 .badge.na{background:#9ca3af}
 .subs{flex:1}.subs .row{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:13px}
 .subs .lab{width:120px;color:#4b5563}.bar{height:9px;border-radius:5px;background:#e5e7eb;flex:0 0 160px;position:relative}
-.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:#1962A1}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--primary)}
 .summarytxt{font-size:16px;margin:6px 0 12px}
 .box{border-radius:8px;padding:12px 16px;margin:12px 0}.box h3{margin:0 0 6px;font-size:15px}
-.flags{background:#fff5f5;border:1px solid #f3caca}.qs{background:#fffbe6;border:1px solid #FCCD02}
+.flags{background:#fff5f5;border:1px solid #f3caca}.qs{background:var(--highlight);border:1px solid var(--accent)}
 .qs ol{margin:4px 0 0 18px;padding:0}.qs li{margin:4px 0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid .box{background:#f8fafc;border:1px solid #e5e7eb}
 ul.tight{margin:4px 0 0 18px;padding:0}ul.tight li{margin:3px 0}
 .flag{margin:6px 0}.flag .why{color:#4b5563;font-size:13px}
 .small{font-size:12.5px;color:#6b7280}.ev a,.ev span{font-family:Consolas,Menlo,monospace;font-size:12px;margin-right:8px}
 .ev .bad{color:#9ca3af;text-decoration:line-through}
-h3.sec{font-size:15px;margin:16px 0 6px;color:#1962A1}
+h3.sec{font-size:15px;margin:16px 0 6px;color:var(--primary)}
 .facts td:first-child{width:200px;color:#4b5563}
 @page{size:A4;margin:14mm}
 @media print{body{background:#fff;font-size:12.5px}.team{box-shadow:none;page-break-before:always;margin:0;padding:8px 0}
 .cover{-webkit-print-color-adjust:exact;print-color-adjust:exact}.badge,.pill,.bar i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 a{text-decoration:none}}
-@media (max-width:700px){.grid{grid-template-columns:1fr}.top{flex-direction:column}.bar{flex-basis:110px}}
+@media (max-width:700px){.cover .wrap{flex-direction:column;align-items:flex-start}.grid{grid-template-columns:1fr}.top{flex-direction:column}.bar{flex-basis:110px}}
 """
 
 
@@ -389,7 +408,7 @@ def _readme_quality(rd: dict) -> str:
     return f"{parts[0]} ({q}/6){detail}"
 
 
-def _score_summary(r: dict) -> str:
+def _score_summary(r: dict, max_score: int = 10) -> str:
     """One plain-language paragraph explaining what the tech score means, for non-technical judges."""
     rv = r.get("review") or {}
     score = rv.get("technical_score")
@@ -402,7 +421,6 @@ def _score_summary(r: dict) -> str:
     parts = []
     if score is None:
         return ""
-    max_score = (r.get("_rubric") or {}).get("max_score", 10)
     if max_score <= 5:
         label = {1: "very little working code", 2: "mostly user interface or mocked functionality",
                  3: "a narrow but real working feature", 4: "a working end-to-end solution",
@@ -434,6 +452,17 @@ def _score_summary(r: dict) -> str:
     return " ".join(parts)
 
 
+def platform_link(sub: dict) -> tuple:
+    """(url, label) for the team's page on the submission platform, or ('', '')."""
+    url = sub.get("platform_url") or sub.get("junction_url") or ""  # junction_url: results from older scans
+    if not url:
+        return "", ""
+    if "/pull/" in url:
+        return url, "Pull request"
+    src = (sub.get("source") or "csv").split(" + ")[0]
+    return url, {"junction": "Junction page", "csv": "Submission page"}.get(src.lower(), f"{src} page")
+
+
 def _team_html(r: dict, cfg: dict) -> str:
     sub, f, rv, snap = r["submission"], r.get("facts") or {}, r.get("review") or {}, r.get("snapshot") or {}
     chal = (cfg["challenges"].get(sub.get("challenge")) or {}).get("name", sub.get("challenge_raw") or "Challenge unknown")
@@ -459,8 +488,11 @@ def _team_html(r: dict, cfg: dict) -> str:
         links.append(f'<a href="{e(sub["demo"])}" target="_blank" rel="noopener">Demo</a>')
     if sub.get("video"):
         links.append(f'<a href="{e(sub["video"])}" target="_blank" rel="noopener">Video</a>')
-    if sub.get("junction_url"):
-        links.append(f'<a href="{e(sub["junction_url"])}" target="_blank" rel="noopener">Junction page</a>')
+    platform_url, label = platform_link(sub)
+    if platform_url:
+        links.append(f'<a href="{e(platform_url)}" target="_blank" rel="noopener">{e(label)}</a>')
+    if sub.get("pr_url") and sub["pr_url"] != platform_url:
+        links.append(f'<a href="{e(sub["pr_url"])}" target="_blank" rel="noopener">Pull request</a>')
     out.append(f'<div class="links" style="margin-top:6px">{"".join(links)}</div>')
 
     rubric = cfg.get("rubric") or {}
@@ -495,7 +527,7 @@ def _team_html(r: dict, cfg: dict) -> str:
         rows.append(f'<div class="row"><span class="lab">Confidence</span><b>{e(rv.get("confidence", ""))}</b></div>')
         subs_html = "".join(rows)
     out.append(f'<div class="top">{badge}<div class="subs">{subs_html}</div></div>')
-    tldr = _score_summary(r) if show_scores else ""
+    tldr = _score_summary(r, rubric.get("max_score", 10)) if show_scores else ""
     if tldr:
         out.append(f'<p class="small" style="margin:6px 0 4px;color:#4b5563"><b>In short:</b> {e(tldr)}</p>')
     if rv.get("summary"):
@@ -558,7 +590,7 @@ def _team_html(r: dict, cfg: dict) -> str:
         tr("Reviewed by", e(" ".join(x for x in [(r.get("review_meta") or {}).get("model", ""),
                                                   "(agent mode)" if (r.get("review_meta") or {}).get("deep") else ""] if x)) if rv else ""),
         tr("Snapshot", e(f"{snap.get('short', '')} on {snap.get('branch', '')}, {_local(cfg, snap.get('commit_date'))} (chosen by {snap.get('method', '')})") if snap.get("ok") else ""),
-    ]
+    ] + [tr(k, e(v)) for k, v in report_rows(f.get("requirements") or {})]
     if any(rows):
         out.append(f'<h3 class="sec">Facts from the repository</h3><table class="facts">{"".join(rows)}</table>')
     narrative = r.get("narrative")
@@ -597,13 +629,15 @@ def render_html(cfg: dict, run: dict, results: dict, title_suffix: str = "") -> 
                     f'<td class="score"><b>{e(score_display)}</b></td>'
                     f'<td>{e(verified)}</td><td>{high_html}</td></tr>')
     deadline = _local(cfg, run.get("deadline", ""))
+    b = brand(cfg)
     head = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(ev['name'])} technical review{e(title_suffix)}</title><style>{CSS}</style></head><body>
-<div class="cover"><div class="wrap"><div class="brand">{e(ev['name'])}</div><h1>Technical review for the jury{e(title_suffix)}</h1>
-<p>Code frozen at the deadline ({e(deadline)}). Generated {e(_local(cfg, run.get('finished', '')))}.</p></div></div>
+<title>{e(ev['name'])} technical review{e(title_suffix)}</title><style>{theme_css(b)}
+{CSS}</style></head><body>
+<div class="cover"><div class="wrap"><div><div class="brand">{e(ev['name'])}</div><h1>Technical review for the jury{e(title_suffix)}</h1>
+<p>Code frozen at the deadline ({e(deadline)}). Generated {e(_local(cfg, run.get('finished', '')))}.</p></div>{logos_html(b)}</div></div>
 <div class="wrap"><div class="howto"><p><b>How to use this.</b> Each team's page shows what their code really does, which claims hold up, and three questions to ask.
 This is advisory evidence, not a verdict: the score covers technical execution only, and every flag can have an innocent explanation. Ask the team before you decide.</p>
-<p class="small">{"Scores are 1-10 per criterion, weighted to a total out of " + e(str(max_total)) + "." if show_scores else "AI scores are hidden until the jury has scored independently."} Links open the exact lines on GitHub as they were at the deadline.</p></div>
+<p class="small">{f"Scores are 1-{rubric.get('max_score', 10)} per criterion, weighted to a total out of " + e(str(max_total)) + "." if show_scores else "AI scores are hidden until the jury has scored independently."} Links open the exact lines on GitHub as they were at the deadline.</p></div>
 <table class="summary"><tr><th>Team</th><th>Challenge</th><th class="score">Score</th><th>Claims verified</th><th>High flags</th></tr>{''.join(rows)}</table>"""
     parts = []
     for _, r in _order(results, cfg, by_score=False):
@@ -614,7 +648,9 @@ This is advisory evidence, not a verdict: the score covers technical execution o
             parts.append(f'<section class="team"><h2>{e(slug)}</h2>'
                          f'<p>Could not render this team. Check {slug}.json for errors.</p></section>')
     body = "\n".join(parts)
-    return head + body + "</div></body></html>"
+    footer = f'<p class="small footer">{e(b["footer"])}</p>' if b.get("footer") else ""
+    html = head + body + footer + "</div></body></html>"
+    return dedash(html) if b.get("no_em_dashes") else html
 
 
 def write_outputs(cfg: dict, workdir: Path, outdir: Path, only: str = "") -> list:

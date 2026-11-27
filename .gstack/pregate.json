@@ -1,0 +1,106 @@
+{
+  "$schema": "https://github.com/garrytan/gstack/docs/pregate.md#pregate-v1",
+  "runner": "python -m pytest {files}",
+  "dependencies": {
+    "techscan/sources.py": [
+      "tests/test_sources.py",
+      "tests/test_cli_report.py",
+      "tests/test_alkemio.py"
+    ],
+    "techscan/intake.py": [
+      "tests/test_sources.py",
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
+    ],
+    "techscan/config.py": [
+      "tests/test_backends.py",
+      "tests/test_branding.py",
+      "tests/test_cli_report.py",
+      "tests/test_requirements.py",
+      "tests/test_rubric_language.py",
+      "tests/test_sources.py",
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
+    ],
+    "techscan/gitops.py": [
+      "tests/test_sources.py",
+      "tests/test_requirements.py"
+    ],
+    "techscan/__main__.py": [
+      "tests/test_backends.py",
+      "tests/test_branding.py",
+      "tests/test_cli_report.py",
+      "tests/test_rubric_language.py",
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
+    ],
+    "techscan/report.py": [
+      "tests/test_cli_report.py",
+      "tests/test_rubric_language.py",
+      "tests/test_branding.py",
+      "tests/test_requirements.py",
+      "tests/test_feedback.py"
+    ],
+    ".github/workflows/selftest.yml": [],
+    "config/examples/full.yaml": [],
+    "techscan/web/templates/scan.tpl": [],
+    "techscan/review.py": [
+      "tests/test_rubric_language.py",
+      "tests/test_backends.py"
+    ],
+    "techscan/pipeline.py": [
+      "tests/test_rubric_language.py",
+      "tests/test_requirements.py"
+    ],
+    "techscan/pack.py": [
+      "tests/test_rubric_language.py",
+      "tests/test_requirements.py"
+    ],
+    "prompts/review_system.md": [
+      "tests/test_rubric_language.py"
+    ],
+    "prompts/scale_10.md": [
+      "tests/test_rubric_language.py"
+    ],
+    "prompts/scale_5.md": [
+      "tests/test_rubric_language.py"
+    ],
+    "config/onegov3.yaml": [
+      "tests/test_backends.py",
+      "tests/test_requirements.py",
+      "tests/test_rubric_language.py",
+      "tests/test_alkemio.py"
+    ],
+    "techscan/branding.py": [
+      "tests/test_branding.py",
+      "tests/test_feedback.py"
+    ],
+    "techscan/observe.py": [
+      "tests/test_branding.py"
+    ],
+    "techscan/requirements.py": [
+      "tests/test_requirements.py"
+    ],
+    "tests/test_requirements.py": [
+      "tests/test_requirements.py"
+    ],
+    "tests/test_backends.py": [
+      "tests/test_backends.py"
+    ],
+    "techscan/alkemio.py": [
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
+    ],
+    "tests/test_alkemio.py": [
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
+    ],
+    "README.md": [],
+    "techscan/feedback.py": [
+      "tests/test_feedback.py"
+    ],
+    "tests/test_feedback.py": [
+      "tests/test_feedback.py"
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-"""Read submissions from a Junction project export or a plain team/repo CSV.
+"""Read submissions from a platform export (Junction, the merged 'pull' CSV) or a plain team/repo CSV.
 
 Only the fields needed for the review are kept. Team member data in the export
 is ignored and never reaches the model.
@@ -16,9 +16,12 @@ from .util import slugify
 
 GITHUB_HTTP = re.compile(r"(?<![\w.-])(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)", re.I)
 GITHUB_SSH = re.compile(r"git@github\.com:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?$", re.I)
+PR_LINK = re.compile(r"github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+", re.I)
+PR_NOTE = "Submitted link is a pull request"
 ANY_URL = re.compile(r"(?:https?://|(?<![\w.-])(?:www\.)?github\.com/)[^\s,;\"'<>]+", re.I)
 TEXT_COLUMNS = {"name", "project", "project name", "projectname", "team", "team name", "description", "punchline",
-                "tagline", "summary", "about", "demo", "video", "projecturl", "challenge", "track", "status"}
+                "tagline", "summary", "about", "demo", "video", "projecturl", "challenge", "track", "status",
+                "platform", "platform_url", "pr_url", "notes"}
 
 
 @dataclass
@@ -35,11 +38,12 @@ class Submission:
     video: str = ""
     punchline: str = ""
     description: str = ""
-    status: str = ""             # Junction status (draft/final) when known
-    junction_url: str = ""
+    status: str = ""             # platform status (draft/final, PR open) when known
+    platform_url: str = ""       # the team's page on the submission platform (Junction, Alkemio, the PR)
+    pr_url: str = ""             # a submitted pull request link, before it is resolved to the fork
     tree_path: str = ""          # branch (and maybe path) from a /tree/... link
     source: str = ""             # which input format it came from
-    team_size: int = 0           # number of team members (from Junction export)
+    team_size: int = 0           # number of team members (from the platform export)
     notes: list = field(default_factory=list)
 
     def to_dict(self):
@@ -100,10 +104,19 @@ def _first(row: dict, *names) -> str:
     return ""
 
 
+def _int(v) -> int:
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return 0
+
+
 def match_challenge(text: str, challenges: dict) -> str:
-    t = (text or "").lower()
+    t = (text or "").lower().strip()
     if not t:
         return ""
+    if t in challenges:
+        return t
     for key, ch in challenges.items():
         for m in ch.get("match", []):
             if m and m in t:
@@ -122,21 +135,29 @@ def read_submissions(path, cfg: dict) -> list:
     used = set()
     for raw_row in reader:
         row = {(k or "").strip().lower(): (v if isinstance(v, str) else "") for k, v in raw_row.items()}
-        is_junction = "source" in row or "projecturl" in row
+        is_junction = "projecturl" in row or ("source" in row and "repo" not in row)
         project = _unescape(_first(row, "name", "project", "project name", "projectname", "team name", "team"))
         repo_field = _first(row, "source", "repo", "repository", "github", "repo url", "repository url", "code", "source code", "url")
+        pr_url = _first(row, "pr_url")
+        m = PR_LINK.search(repo_field or "")
+        if m:  # the repo part of a PR link is the challenge repo, not the team's code
+            pr_url, repo_field = "https://" + m.group(0), ""
         parsed = normalize_repo(repo_field)
         guessed_from = ""
-        if not parsed:  # a GitHub link in a custom submission field (never from free text like the description)
+        if not parsed and not pr_url:  # a GitHub link in a custom submission field (never from free text like the description)
             for k, v in row.items():
                 if k in TEXT_COLUMNS:
                     continue
                 for url in ANY_URL.findall(v or ""):
+                    m = PR_LINK.search(url)
+                    if m:
+                        pr_url, guessed_from = "https://" + m.group(0), k
+                        break
                     parsed = normalize_repo(url)
                     if parsed:
                         guessed_from = k
                         break
-                if parsed:
+                if parsed or pr_url:
                     break
         if not project and parsed:
             project = parsed[3]
@@ -157,10 +178,12 @@ def read_submissions(path, cfg: dict) -> list:
             punchline=_unescape(_first(row, "punchline", "tagline")),
             description=_unescape(_first(row, "description", "summary", "about")),
             status=_first(row, "status"),
-            junction_url=_first(row, "projecturl"),
-            source="junction" if is_junction else "csv",
-            team_size=int(_first(row, "team_size", "teamsize") or 0),
+            platform_url=_first(row, "platform_url", "projecturl"),
+            pr_url=pr_url,
+            source=_first(row, "platform") or ("junction" if is_junction else "csv"),
+            team_size=_int(_first(row, "team_size", "teamsize")),
         )
+        sub.notes.extend(n.strip() for n in _first(row, "notes").split(" | ") if n.strip())
         if parsed:
             sub.repo_url, sub.clone_url, sub.owner, sub.repo = parsed
             if guessed_from:
@@ -168,6 +191,8 @@ def read_submissions(path, cfg: dict) -> list:
             m = re.search(r"github\.com/[^/\s]+/[^/\s]+/tree/([^?#\s]+)", repo_field or "", re.I)
             if m:
                 sub.tree_path = m.group(1).strip("/")
+        elif pr_url and not _first(row, "pr_url"):
+            sub.notes.append(f"{PR_NOTE} ({pr_url}); run 'pull' so it is resolved to the team's fork")
         else:
             sub.notes.append("No repository link found in the submission")
         base = slugify(project)
@@ -176,6 +201,7 @@ def read_submissions(path, cfg: dict) -> list:
             slug, i = f"{base}-{i}", i + 1
         used.add(slug)
         sub.slug = slug
+        sub.notes = list(dict.fromkeys(sub.notes))  # a re-read merged CSV must not repeat a note
         subs.append(sub)
 
     seen_repos = {}

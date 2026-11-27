@@ -405,6 +405,52 @@ class GitHub:
             url = nxt
         return {"error": "", "items": items}
 
+    def pulls(self, owner: str, repo: str, state: str = "open", max_pages=5) -> tuple:
+        """Pull requests into owner/repo. Returns (list, error)."""
+        out, url = [], f"https://api.github.com/repos/{owner}/{repo}/pulls?state={state}&per_page=100&sort=created"
+        for _ in range(max_pages):
+            data, err, nxt = self.get_page(url)
+            if data is None:
+                return out, err
+            if not isinstance(data, list) or not data:
+                break
+            out.extend(data)
+            if not nxt:
+                break
+            url = nxt
+        return out, ""
+
+    def pull(self, owner: str, repo: str, number: int) -> tuple:
+        """One pull request. Returns (dict or None, error)."""
+        data, err = self.get(f"https://api.github.com/repos/{owner}/{repo}/pulls/{int(number)}")
+        return (data if isinstance(data, dict) else None), err
+
+    def pr_status(self, owner: str, repo: str, number: int) -> dict:
+        """State and CI result of a pull request. summary: passed | failed | pending | awaiting approval | none."""
+        pr, err = self.pull(owner, repo, number)
+        if not pr:
+            return {"summary": "unknown", "error": err}
+        sha = (pr.get("head") or {}).get("sha", "")
+        out = {"number": number, "url": pr.get("html_url", ""), "state": pr.get("state", ""),
+               "draft": bool(pr.get("draft")), "merged": bool(pr.get("merged_at")), "head_sha": sha, "checks": []}
+        data, _ = self.get(f"https://api.github.com/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=100") if sha else (None, "")
+        runs = (data or {}).get("check_runs") or []
+        out["checks"] = [{"name": r.get("name", ""), "status": r.get("status", ""), "conclusion": r.get("conclusion") or ""}
+                         for r in runs]
+        concl = {c["conclusion"] for c in out["checks"]}
+        if concl & {"failure", "timed_out", "cancelled"}:
+            out["summary"] = "failed"
+        elif any(c["status"] != "completed" for c in out["checks"]):
+            out["summary"] = "pending"
+        elif out["checks"]:
+            out["summary"] = "passed"
+        else:
+            wf, _ = self.get(f"https://api.github.com/repos/{owner}/{repo}/actions/runs?head_sha={sha}&per_page=20") if sha else (None, "")
+            waiting = [w for w in (wf or {}).get("workflow_runs") or []
+                       if w.get("conclusion") == "action_required" or w.get("status") in ("action_required", "waiting")]
+            out["summary"] = "awaiting approval" if waiting else "none"
+        return out
+
     def org_repos(self, org: str) -> list:
         out, url = [], f"https://api.github.com/orgs/{org}/repos?type=all&per_page=100&sort=created&direction=desc"
         for _ in range(10):

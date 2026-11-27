@@ -3,7 +3,8 @@
   init       interactive wizard to generate a config YAML for a new event
   web        launch the local web dashboard (requires: pip install hfg-techscan[web])
   preflight  check git, GitHub access and the review engine before the event
-  discover   list team repos in the GitHub org (for runs before Junction submissions exist)
+  discover   list team repos in the GitHub org (for runs before platform submissions exist)
+  pull       pull submissions from the configured sources (GitHub PRs, Alkemio/CSV, Junction) into one CSV
   scan       clone, check, review and write the jury outputs
   report     rebuild the outputs from the last scan without re-running anything
   demo       build a fake event with planted problems, to rehearse the whole flow
@@ -37,7 +38,7 @@ def _check_challenge_keywords(cfg) -> list:
     all_kw = list(keyword_owners.keys())
     for i, a in enumerate(all_kw):
         for b in all_kw[i + 1:]:
-            if a != b and (a in b or b in a):
+            if a != b and (a in b or b in a) and keyword_owners[a] != keyword_owners[b]:
                 shorter, longer = (a, b) if len(a) < len(b) else (b, a)
                 warnings.append(f"Keyword \"{shorter}\" is a substring of \"{longer}\" "
                                 f"(challenges '{keyword_owners[shorter]}' vs '{keyword_owners[longer]}')")
@@ -92,6 +93,13 @@ def cmd_preflight(cfg, args) -> int:
     for w in rubric_warnings:
         log(f"WARN {w}")
 
+    from .branding import check as check_branding
+    brand_warnings = check_branding(cfg.get("branding") or {})
+    for w in brand_warnings:
+        log(f"WARN {w}")
+    if cfg.get("branding") and not brand_warnings:
+        log("OK   Branding: colours, contrast and asset files")
+
     # Partner config summary
     partners = cfg.get("partners", {})
     if partners:
@@ -124,14 +132,12 @@ def cmd_preflight(cfg, args) -> int:
         err = backend.ping()
         log(("FAIL " if err else "OK   ") + ("Review engine answered" if not err else err))
         ok &= not err
-    jcfg = cfg.get("junction") or {}
-    if jcfg.get("event_slug") or jcfg.get("event_id"):
-        from .junction import JunctionClient
-        jc = JunctionClient(cfg)
-        pull_ok = not jc.problem_pull()
-        log(f"{'OK   ' if pull_ok else 'WARN '} Junction pull: {'ready' if pull_ok else jc.problem_pull()}")
-    else:
-        log("     Junction: not configured (optional)")
+    from .sources import source_problems
+    problems = source_problems(cfg, ping=args.ping)
+    for label, problem in problems:
+        log(f"{'WARN ' if problem else 'OK   '} Source {label}" + (f": {problem}" if problem else ""))
+    if not problems:
+        log("     No submission sources configured; pass -s <csv> to scan")
     log("Preflight " + ("passed" if ok else "found problems"))
     return 0 if ok else 1
 
@@ -181,12 +187,13 @@ def cmd_discover(cfg, args) -> int:
 def cmd_scan(cfg, args) -> int:
     from .pipeline import run_pipeline
     from .report import write_outputs
+    from .sources import configured_sources
     submissions = getattr(args, "submissions", "")
-    junction_mode = getattr(args, "junction", False)
-    if junction_mode and not submissions:
-        submissions = _junction_pull_csv(cfg)
+    wants_pull = getattr(args, "pull", False) or getattr(args, "junction", False)
+    if not submissions and (wants_pull or configured_sources(cfg)):
+        submissions = str(_pull(cfg))
     if not submissions:
-        raise SystemExit("No submissions file. Pass -s <file> or use --junction to pull from Junction.")
+        raise SystemExit("No submissions file. Pass -s <file>, or add a 'sources:' list to the config.")
     if not Path(submissions).exists():
         raise SystemExit(f"Submissions file not found: {submissions}")
     if args.backend:
@@ -202,26 +209,17 @@ def cmd_scan(cfg, args) -> int:
     return 0
 
 
-def _junction_pull_csv(cfg) -> str:
-    from .junction import JunctionClient, save_projects_csv
-    client = JunctionClient(cfg)
-    problem = client.problem_pull()
-    if problem:
-        raise SystemExit(f"Junction pull: {problem}")
-    log("Pulling projects CSV from Junction...")
-    csv_data, err = client.pull_projects_csv()
-    if err:
-        raise SystemExit(f"Junction pull failed: {err}")
-    out_path = Path(cfg["paths"]["workdir"]) / "junction-submissions.csv"
-    count = save_projects_csv(csv_data, out_path)
-    log(f"  {count} row(s) pulled from Junction -> {out_path}")
-    return str(out_path)
+def _pull(cfg, out_path=None):
+    from .sources import SourceError, pull_all
+    try:
+        return pull_all(cfg, out_path)
+    except SourceError as e:
+        raise SystemExit(f"Pull failed: {e}") from e
 
 
-def cmd_junction_pull(cfg, args) -> int:
-    csv_path = _junction_pull_csv(cfg)
-    log(f"Submissions saved to {csv_path}")
-    log(f"Next: python -m techscan scan -c {args.config} -s {csv_path}")
+def cmd_pull(cfg, args) -> int:
+    csv_path = _pull(cfg, getattr(args, "output", "") or None)
+    log(f"Check the CSV, fix any row by hand if needed, then: python -m techscan scan -c {args.config} -s {csv_path}")
     return 0
 
 
@@ -276,10 +274,21 @@ def cmd_challenge_report(cfg, args) -> int:
         subset = {s: r for s, r in results.items() if r["submission"].get("challenge") == key}
         if not subset:
             continue
-        html = challenge_owner_report(subset, challenge_key=key, event_name=cfg["event"]["name"])
+        from .branding import brand, dedash
+        b = brand(cfg)
+        html = challenge_owner_report(subset, challenge_key=key, event_name=cfg["event"]["name"], branding=b)
+        html = dedash(html) if b.get("no_em_dashes") else html
         out = Path(cfg["paths"]["output"]) / f"challenge-report-{key}.html"
         out.write_text(html, encoding="utf-8")
         log(f"  {out}")
+    return 0
+
+
+def cmd_feedback(cfg, args) -> int:
+    from .feedback import draft, send
+    if args.send:
+        return send(cfg, args.file or None, channel=args.channel, yes=args.yes)
+    draft(cfg, args.file or None)
     return 0
 
 
@@ -309,20 +318,25 @@ def main(argv=None) -> int:
     p.add_argument("-o", "--output", default="submissions-github.csv")
 
     p = with_config(sub.add_parser("scan", help="run the full scan and write the jury outputs"))
-    p.add_argument("-s", "--submissions", default="", help="Junction export CSV or a project,repo,challenge CSV")
-    p.add_argument("--junction", action="store_true", help="pull submissions from Junction API instead of CSV")
+    p.add_argument("-s", "--submissions", default="",
+                   help="submissions CSV (platform export or project,repo,challenge); default: pull from 'sources:'")
+    p.add_argument("--pull", action="store_true", help="pull from the configured sources first (default without -s)")
+    p.add_argument("--junction", action="store_true", help=argparse.SUPPRESS)  # old name for --pull
     p.add_argument("--only", default="", help="comma-separated team slugs or project names")
     p.add_argument("--skip-review", action="store_true", help="only the non-AI checks")
     p.add_argument("--force-review", action="store_true", help="ignore cached reviews")
     p.add_argument("--deep", default="", help="comma-separated teams to review in agent mode (finalists)")
     p.add_argument("--workers", type=int, default=0)
-    p.add_argument("--backend", choices=["claude-cli", "anthropic", "offline"], default="")
+    p.add_argument("--backend", choices=["claude-cli", "anthropic", "greenpt", "openai-compatible", "offline"], default="")
     p.add_argument("--model", default="")
 
     p = with_config(sub.add_parser("report", help="rebuild outputs from the last scan"))
     p.add_argument("--only", default="", help="write one pack with just these teams (e.g. the finalists)")
 
-    with_config(sub.add_parser("junction-pull", help="pull submissions from Junction API and save as CSV"))
+    p = with_config(sub.add_parser("pull", help="pull submissions from the configured sources into one CSV"))
+    p.add_argument("-o", "--output", default="", help="where to write the CSV (default: <workdir>/submissions-pulled.csv)")
+    p = with_config(sub.add_parser("junction-pull", help=argparse.SUPPRESS))  # old name for 'pull'
+    p.add_argument("-o", "--output", default="")
 
     p = with_config(sub.add_parser("observe", help="poll team repos during the event and record timelines"))
     p.add_argument("-s", "--submissions", required=True, help="submissions CSV (needs repo URLs)")
@@ -333,6 +347,13 @@ def main(argv=None) -> int:
     p.add_argument("-s", "--submissions", default="", help="submissions CSV (optional, for team names)")
 
     p = with_config(sub.add_parser("challenge-report", help="generate scouting report for challenge owners"))
+
+    p = with_config(sub.add_parser("feedback", help="after the event: draft feedback per team, then send the approved "
+                                                    "messages via Alkemio (see techscan/feedback.py)"))
+    p.add_argument("--send", action="store_true", help="send the messages marked send: true (asks first)")
+    p.add_argument("--yes", action="store_true", help="with --send: do not ask for confirmation")
+    p.add_argument("--channel", choices=["chat", "email"], default="", help="Alkemio chat (default) or e-mail")
+    p.add_argument("--file", default="", help="drafts file (default: <output>/team-feedback.yaml)")
 
     p = with_config(sub.add_parser("web", help="launch the local web dashboard"))
     p.add_argument("--host", default="127.0.0.1")
@@ -369,8 +390,8 @@ def main(argv=None) -> int:
         start(args.config, host=args.host, port=args.port, open_browser=not args.no_browser)
         return 0
     dispatch = {"preflight": cmd_preflight, "discover": cmd_discover, "scan": cmd_scan, "report": cmd_report,
-                 "junction-pull": cmd_junction_pull, "observe": cmd_observe, "narratives": cmd_narratives,
-                 "challenge-report": cmd_challenge_report}
+                 "pull": cmd_pull, "junction-pull": cmd_pull, "observe": cmd_observe, "narratives": cmd_narratives,
+                 "challenge-report": cmd_challenge_report, "feedback": cmd_feedback}
     return dispatch[args.cmd](cfg, args)
 
 

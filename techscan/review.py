@@ -95,10 +95,35 @@ class ReviewError(Exception):
     pass
 
 
+LANGUAGES = {"en": "English", "nl": "Dutch (Nederlands)", "de": "German", "fr": "French"}
+
+
+def scale_text(max_score) -> tuple:
+    """(intro, technical) scoring-scale sections for a 1-5 or 1-10 rubric."""
+    name = "scale_5.md" if int(max_score or 10) <= 5 else "scale_10.md"
+    intro, technical = (PROMPTS_DIR / name).read_text(encoding="utf-8").split("@@TECHNICAL@@\n", 1)
+    return intro, technical
+
+
+def language_rule(code: str) -> tuple:
+    """(language name for 'plain ...', extra rule appended after it). English adds nothing."""
+    code = (code or "en").lower()
+    name = LANGUAGES.get(code, code)
+    if code == "en":
+        return "English", ""
+    return name, (f"\n- Write every free-text field (summary, notes, strengths, weaknesses, rationales, jury questions) "
+                  f"in {name}. Keep JSON keys, enum values, file paths, code identifiers and quoted code exactly "
+                  f"as they are. Do not use em dashes.")
+
+
 def system_prompt(cfg: dict, challenge: dict, deep: bool = False) -> str:
     schema = build_schema(cfg)
     text = (PROMPTS_DIR / "review_system.md").read_text(encoding="utf-8")
     ev = cfg["event"]
+    intro, technical = scale_text((cfg.get("rubric") or {}).get("max_score", 10))
+    lang_name, lang_rule = language_rule((cfg.get("review") or {}).get("language", "en"))
+    text = (text.replace("{{SCALE_INTRO}}", intro).replace("{{SCALE_TECHNICAL}}", technical)
+                .replace("{{LANGUAGE_RULE}}", lang_rule).replace("{{LANGUAGE}}", lang_name))
     text = (text.replace("{{EVENT_NAME}}", ev.get("name", "a hackathon"))
                 .replace("{{EVENT_CONTEXT}}", ev.get("context", ""))
                 .replace("{{BUILD_TIME}}", ev.get("build_time", "a weekend"))
@@ -183,7 +208,7 @@ def _evidence(items, file_lines: dict, seen_files: dict):
     return out, bad
 
 
-def validate(data, file_lines: dict, seen_files: dict) -> dict:
+def validate(data, file_lines: dict, seen_files: dict, max_score: int = 10) -> dict:
     """Coerce model output into the schema and check every citation against the snapshot."""
     if not isinstance(data, dict):
         raise ReviewError("Model output was not a JSON object")
@@ -241,8 +266,10 @@ def validate(data, file_lines: dict, seen_files: dict) -> dict:
                                "detail": truncate(str(f.get("detail", "")), 500), "evidence": ev(f.get("evidence"))})
     r["jury_questions"] = [truncate(str(q), 300) for q in (data.get("jury_questions") or []) if str(q).strip()][:3]
     sc = data.get("scores") or {}
-    r["scores"] = {k: _clamp(sc.get(k), default=5) for k in sc if isinstance(sc.get(k), (int, float, str))}
-    r["technical_score"] = _clamp(data.get("technical_score"))
+    mid = (int(max_score) + 1) // 2  # an unreadable score lands mid-scale, never at the top
+    r["scores"] = {k: _clamp(sc.get(k), default=mid, hi=max_score)
+                   for k in sc if isinstance(sc.get(k), (int, float, str))}
+    r["technical_score"] = _clamp(data.get("technical_score"), hi=max_score)
     conf = str(data.get("confidence", "medium")).lower()
     r["confidence"] = conf if conf in ("high", "medium", "low") else "medium"
     r["evidence_checked"] = {"total": ev_total, "invalid": bad_total}
@@ -278,6 +305,7 @@ class ClaudeCLI:
             self.flags = set(re.findall(r"(--[a-z][a-z-]+)", out + err))
         self.shim = self.exe.lower().endswith((".cmd", ".bat"))
         self.compat = False
+        self.schema = build_schema(cfg)
 
     def problem(self) -> str:
         if not self.exe:
@@ -324,7 +352,7 @@ class ClaudeCLI:
         return code, out, err
 
     def review(self, system_text: str, user_text: str, cwd: Path, deep=False) -> tuple:
-        code, out, err = self._call(system_text, user_text, cwd, deep)
+        code, out, err = self._call(system_text, user_text, cwd, deep, self.schema)
         if code == 124:
             raise ReviewError(f"Claude Code timed out after {self.timeout // 60} min")
         payload = extract_json(out)
@@ -366,6 +394,7 @@ class AnthropicAPI:
         self.model = cfg["review"]["model"]
         self.timeout = int(cfg["review"]["timeout_minutes"]) * 60
         self.client = None
+        self.schema = build_schema(cfg)
 
     def problem(self) -> str:
         try:
@@ -388,7 +417,7 @@ class AnthropicAPI:
             system=system_text,
             messages=[{"role": "user", "content": user_text}],
             tools=[{"name": "submit_review", "description": "Submit the structured technical review.",
-                    "input_schema": SCHEMA}],
+                    "input_schema": self.schema}],
             tool_choice={"type": "tool", "name": "submit_review"},
         )
         data = next((b.input for b in resp.content if getattr(b, "type", "") == "tool_use"), None)
@@ -402,6 +431,135 @@ class AnthropicAPI:
 
     def ping(self) -> str:
         return self.problem()
+
+
+class OpenAICompatible:
+    """Any OpenAI-compatible chat completions API: GreenPT (EU-hosted open models), Mistral, vLLM, Ollama.
+
+    Asks for the review as JSON through response_format and steps down when the server does not support it:
+    json_schema -> json_object -> plain text (the JSON is then extracted from the answer). Standard library only.
+    """
+    PRESETS = {"greenpt": ("https://api.greenpt.ai/v1", "GREENPT_API_KEY"),
+               "openai-compatible": ("", "OPENAI_API_KEY")}
+    MODES = ("json_schema", "json_object", "text")
+
+    def __init__(self, cfg: dict):
+        rv = cfg["review"]
+        self.name = rv["backend"]
+        base, key_env = self.PRESETS.get(self.name, ("", "OPENAI_API_KEY"))
+        self.base = (rv.get("api_base") or base).rstrip("/")
+        self.key_env = rv.get("api_key_env") or key_env
+        self.model = rv["model"]
+        self.timeout = int(rv["timeout_minutes"]) * 60
+        self.schema = build_schema(cfg)
+        self.mode = rv.get("response_format") or "json_schema"
+        self.max_tokens = int(rv.get("max_output_tokens") or 16000)
+
+    def problem(self) -> str:
+        if not self.base:
+            return f"Set review.api_base for the {self.name} backend (e.g. https://host/v1)."
+        if not os.environ.get(self.key_env):
+            return f"{self.key_env} is not set."
+        if not self.model or self.model.lower().startswith("claude"):
+            return f"Set review.model to a model this {self.name} API serves (run preflight --ping to list them)."
+        if self.mode not in self.MODES:
+            return f"review.response_format must be one of {', '.join(self.MODES)}"
+        return ""
+
+    def _request(self, method: str, path: str, body=None, timeout=None):
+        """(data, error, http_status). Retries 429 and 5xx with backoff."""
+        import time
+        import urllib.error
+        import urllib.request
+        url = self.base + path
+        headers = {"Authorization": f"Bearer {os.environ.get(self.key_env, '')}", "Accept": "application/json",
+                   "User-Agent": "hfg-techscan"}
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        last = ("", 0)
+        for attempt in range(4):
+            if attempt:
+                time.sleep(min(60, 5 * 2 ** (attempt - 1)))
+            req = urllib.request.Request(url, data=data, headers=headers, method=method)
+            try:
+                with urllib.request.urlopen(req, timeout=timeout or self.timeout) as r:
+                    return json.loads(r.read().decode("utf-8", errors="replace")), "", r.status
+            except urllib.error.HTTPError as e:
+                with e:
+                    detail = e.read().decode("utf-8", errors="replace")[:600]
+                try:
+                    err = json.loads(detail).get("error")
+                    detail = (err.get("message") if isinstance(err, dict) else str(err or "")) or detail
+                except (ValueError, AttributeError):
+                    pass
+                last = (f"HTTP {e.code}: {detail}", e.code)
+                if e.code not in (429, 500, 502, 503, 504):
+                    break
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
+                last = (f"{self.name} not reachable: {e}", 0)
+        return None, last[0], last[1]
+
+    def _response_format(self):
+        if self.mode == "json_schema":
+            return {"type": "json_schema", "json_schema": {"name": "review", "schema": self.schema, "strict": False}}
+        if self.mode == "json_object":
+            return {"type": "json_object"}
+        return None
+
+    def review(self, system_text: str, user_text: str, cwd: Path, deep=False) -> tuple:
+        if deep:
+            raise ReviewError(f"Deep mode is only available with the claude-cli backend, not {self.name}")
+        while True:
+            body = {"model": self.model, "temperature": 0, "max_tokens": self.max_tokens,
+                    "messages": [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]}
+            fmt = self._response_format()
+            if fmt:
+                body["response_format"] = fmt
+            data, err, status = self._request("POST", "/chat/completions", body)
+            if data is None and status in (400, 422) and fmt and re.search(r"(?i)response_format|json_schema|json_object|schema", err):
+                nxt = self.MODES[self.MODES.index(self.mode) + 1]
+                log(f"  {self.name}: '{self.mode}' output not supported, falling back to '{nxt}'")
+                self.mode = nxt
+                continue
+            cap = re.search(r"(?i)(?:max_tokens|max_completion_tokens|completion tokens)\D{0,40}?(?:limited to|at most|<=?|maximum(?: is)?)\s*(\d{3,6})", err or "")
+            if data is None and status in (400, 422) and cap and int(cap.group(1)) < self.max_tokens:
+                log(f"  {self.name}: {self.model} allows at most {cap.group(1)} output tokens, retrying with that")
+                self.max_tokens = int(cap.group(1))
+                continue
+            break
+        if data is None:
+            raise ReviewError(err)
+        choice = (data.get("choices") or [{}])[0]
+        if choice.get("finish_reason") == "length":
+            raise ReviewError(f"The model ran out of output tokens ({self.max_tokens}) before finishing the review. "
+                              "Reasoning models spend tokens on hidden thinking: raise review.max_output_tokens.")
+        review = extract_json((choice.get("message") or {}).get("content") or "")
+        if not isinstance(review, dict):
+            raise ReviewError(f"{self.name} returned no review JSON")
+        if not review.get("summary") or not review.get("claims"):
+            raise ReviewError("Review JSON missing required fields (possible injection)")
+        usage = data.get("usage") or {}
+        meta = {"backend": self.name, "model": data.get("model") or self.model, "deep": False,
+                "response_format": self.mode, "input_tokens": usage.get("prompt_tokens"),
+                "output_tokens": usage.get("completion_tokens")}
+        return review, meta
+
+    def ping(self) -> str:
+        problem = self.problem()
+        if problem:
+            return problem
+        data, err, _ = self._request("GET", "/models", timeout=30)
+        if data is None:
+            return f"could not list models: {err}"
+        ids = sorted(m.get("id", "") for m in (data.get("data") or []) if isinstance(m, dict))
+        if ids and self.model not in ids:
+            return f"model '{self.model}' is not served here. Available: {', '.join(ids[:15])}"
+        reply, err, _ = self._request("POST", "/chat/completions", {
+            "model": self.model, "max_tokens": 20, "temperature": 0,
+            "messages": [{"role": "user", "content": 'Reply with the JSON {"ok": "yes"} only.'}]}, timeout=60)
+        return "" if reply else f"test request failed: {err}"
 
 
 class Offline:
@@ -439,20 +597,39 @@ def make_backend(cfg: dict):
         return ClaudeCLI(cfg)
     if kind == "anthropic":
         return AnthropicAPI(cfg)
+    if kind in OpenAICompatible.PRESETS:
+        return OpenAICompatible(cfg)
     return Offline(cfg)
 
 
-def cache_key(system_text: str, user_text: str, deep: bool) -> str:
-    """Same input -> same cached review, whichever model or backend produced it (meta records which)."""
-    return sha256_text("|".join([PROMPT_VERSION, str(deep), system_text, user_text]))
+def cache_key(system_text: str, user_text: str, deep: bool, engine: str = "") -> str:
+    """Same input -> same cached review. Claude reviews share one cache whichever Claude model wrote them (meta
+    records which); an API backend such as GreenPT gets its own key so the two can be compared."""
+    return sha256_text("|".join([PROMPT_VERSION, str(deep), system_text, user_text] + ([engine] if engine else [])))
+
+
+def _engine(cfg) -> str:
+    """'' for the Claude and offline backends (keeps existing caches valid), else backend:model."""
+    rv = cfg.get("review") or {}
+    return "" if rv.get("backend") in ("claude-cli", "anthropic", "offline") else f"{rv.get('backend')}:{rv.get('model')}"
+
+
+def _cache_file(cfg, slug: str) -> Path:
+    eng = _engine(cfg)
+    suffix = "." + re.sub(r"[^a-z0-9_.-]", "-", eng.split(":")[0].lower()) if eng else ""
+    return Path(cfg["paths"]["workdir"]) / "reviews" / f"{slug}{suffix}.json"
+
+
+def _max_score(cfg) -> int:
+    return int((cfg.get("rubric") or {}).get("max_score", 10))
 
 
 def cached_review(cfg, slug, system_text, user_text, deep, file_lines, seen_files):
     """The stored review for exactly this input, or None."""
-    cached = read_json(Path(cfg["paths"]["workdir"]) / "reviews" / f"{slug}.json")
-    if isinstance(cached, dict) and cached.get("key") == cache_key(system_text, user_text, deep) and cached.get("raw"):
+    cached = read_json(_cache_file(cfg, slug))
+    if isinstance(cached, dict) and cached.get("key") == cache_key(system_text, user_text, deep, _engine(cfg))             and cached.get("raw"):
         try:
-            return {"meta": cached.get("meta", {}), "review": validate(cached["raw"], file_lines, seen_files)}
+            return {"meta": cached.get("meta", {}), "review": validate(cached["raw"], file_lines, seen_files, _max_score(cfg))}
         except ReviewError:
             return None
     return None
@@ -460,13 +637,13 @@ def cached_review(cfg, slug, system_text, user_text, deep, file_lines, seen_file
 
 def run_review(backend, cfg, slug, system_text, user_text, cwd, deep, file_lines, seen_files, force=False) -> dict:
     workdir = Path(cfg["paths"]["workdir"])
-    cache_file = workdir / "reviews" / f"{slug}.json"
-    key = cache_key(system_text, user_text, deep)
+    cache_file = _cache_file(cfg, slug)
+    key = cache_key(system_text, user_text, deep, _engine(cfg))
     cached = read_json(cache_file)
     if not force and isinstance(cached, dict) and cached.get("key") == key and cached.get("raw"):
         try:
             return {"status": "ok", "cached": True, "meta": cached.get("meta", {}),
-                    "review": validate(cached["raw"], file_lines, seen_files)}
+                    "review": validate(cached["raw"], file_lines, seen_files, _max_score(cfg))}
         except ReviewError:
             pass
     last_err = ""
@@ -476,7 +653,7 @@ def run_review(backend, cfg, slug, system_text, user_text, cwd, deep, file_lines
                 raw, meta = backend.review(system_text, user_text, cwd, deep, slug=slug)
             else:
                 raw, meta = backend.review(system_text, user_text, cwd, deep)
-            review = validate(raw, file_lines, seen_files)
+            review = validate(raw, file_lines, seen_files, _max_score(cfg))
             write_json(cache_file, {"key": key, "raw": raw, "meta": meta, "prompt_version": PROMPT_VERSION})
             return {"status": "ok", "cached": False, "meta": meta, "review": review}
         except ReviewError as e:

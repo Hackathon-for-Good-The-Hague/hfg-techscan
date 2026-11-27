@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from . import facts as F
+from . import requirements as R
 from .gitops import (GitHub, branch_from_tree_path, clone_or_update, commit_log, default_branch, git, history_patch,
                      other_branches, snapshot, summarize_activity)
 from .intake import match_challenge, read_submissions
@@ -68,11 +69,20 @@ def _load_templates(cfg, results, workdir: Path) -> dict:
                 info["line_hashes"] = template_line_hashes(inv)
                 _, out, _ = git(["rev-list", "--all"], cwd=dest)
                 info["shas"] = frozenset(x.strip() for x in out.split() if x.strip())
-                cands = [f for f in inv.files if f["kind"] == "doc" and re.search(r"(?i)(brief|challenge)", f["path"])]
-                cands += [f for f in inv.files if re.match(r"(?i)^readme\.md$", f["path"])]
-                if cands:
-                    info["brief"] = inv.read(cands[0]["path"])
-                    info["brief_source"] = f"template: {cands[0]['path']}"
+                paths = {f["path"].lower(): f["path"] for f in inv.files}
+                wanted = [paths[p.lower()] for p in (ch.get("brief_files") or []) if p.lower() in paths]
+                missing = [p for p in (ch.get("brief_files") or []) if p.lower() not in paths]
+                if missing:
+                    log(f"Template for {key}: brief file(s) not found: {', '.join(missing)}")
+                if wanted:  # several organiser files, e.g. CHALLENGE.md + docs/judging-criteria.md
+                    info["brief"] = "\n\n".join(f"===== {p} =====\n{inv.read(p)}" for p in wanted)
+                    info["brief_source"] = "template: " + ", ".join(wanted)
+                else:
+                    cands = [f for f in inv.files if f["kind"] == "doc" and re.search(r"(?i)(brief|challenge)", f["path"])]
+                    cands += [f for f in inv.files if re.match(r"(?i)^readme\.md$", f["path"])]
+                    if cands:
+                        info["brief"] = inv.read(cands[0]["path"])
+                        info["brief_source"] = f"template: {cands[0]['path']}"
             else:
                 log(f"Template for {key} not available: {msg if not ok else snap.get('error', 'no commits')}")
         if ch.get("brief_path"):
@@ -143,6 +153,9 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
             return res
         if s.owner and gh.enabled:
             res["github"]["meta"] = gh.repo_meta(s.owner, s.repo)
+        pr = R.pr_from_url(s.pr_url)
+        if pr and gh.enabled and not gh.disabled_reason:
+            res["github"]["pr"] = gh.pr_status(*pr)
         ok, msg = clone_or_update(s.clone_url, dest)
         if not ok:
             _failed(res, "unreachable", msg)
@@ -250,6 +263,10 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
             r["facts"] = facts
             r["flags"] = F.build_flags(sub, r["snapshot"], r["github"], facts, sim,
                                        org=ev.get("github_org", ""), template=tmpl.get("url", ""))
+            rf = R.gather(inv, tmpl, sub, chal, r["github"])
+            if rf:
+                facts["requirements"] = rf
+                r["flags"] = R.apply_flags(r["flags"], rf, chal, r["snapshot"])
             if custom_checks:
                 from .checks import CheckContext, run_checks
                 ctx = CheckContext(submission=sub, snapshot=r["snapshot"], facts=facts,
@@ -286,7 +303,8 @@ def run_pipeline(cfg: dict, submissions_path, only="", skip_review=False, force_
         chal = cfg["challenges"].get(sub["challenge"]) or {}
         brief = templates.get(sub["challenge"], {}).get("brief", "")
         user, info = build_pack(inv, r["facts"], sub, chal, brief, r["flags"], secrets_raw.get(slug, set()),
-                                int(budget or rv["budget_chars"]), int(rv["max_file_chars"]), include_content=not is_deep)
+                                int(budget or rv["budget_chars"]), int(rv["max_file_chars"]), include_content=not is_deep,
+                                brief_chars=int(rv.get("brief_chars") or 14000))
         file_lines = {f["path"]: f["lines"] for f in inv.files}
         seen = file_lines if is_deep else info["included_lines"]
         return chal, user, info, file_lines, seen

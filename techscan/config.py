@@ -9,6 +9,8 @@ import yaml
 
 from .util import parse_dt
 
+BACKENDS = ("claude-cli", "anthropic", "greenpt", "openai-compatible", "offline")
+
 DEFAULTS = {
     "event": {
         "name": "Hackathon for Good",
@@ -27,10 +29,17 @@ DEFAULTS = {
         "workers": 3,
         "budget_chars": 400000,
         "max_file_chars": 40000,
+        "brief_chars": 14000,  # how much of the challenge brief the model sees
         "timeout_minutes": 15,
         "claude_path": "",
         "effort": "",
         "deep_teams": [],
+        "language": "en",
+        # greenpt / openai-compatible only: API root, the env var holding the key, and json output mode
+        "api_base": "",          # greenpt default: https://api.greenpt.ai/v1
+        "api_key_env": "",       # greenpt default: GREENPT_API_KEY; openai-compatible: OPENAI_API_KEY
+        "response_format": "",   # json_schema (default) | json_object | text; steps down automatically
+        "max_output_tokens": 0,  # 0 = 16000; reasoning models need more because hidden thinking counts  # language of the AI-written text in the jury pack: en, nl, de, fr
     },
     "rubric": {
         "show_scores_to_jury": False,  # when False, jury packs show evidence/claims/flags but not AI scores
@@ -58,6 +67,12 @@ DEFAULTS = {
         "extra_secret_patterns": [],
         "custom_checks_dir": "",
     },
+    # colours, fonts and logos for the jury pack (see techscan/branding.py for every key and its default)
+    "branding": {},
+    # where submissions come from, in priority order (see techscan/sources.py); empty = pass -s <csv>
+    "sources": [],
+    # after the event: messages to teams via Alkemio (see techscan/feedback.py); channel chat|email
+    "feedback": {"channel": "chat", "max_points": 3, "intro": "", "closing": ""},
     "junction": {
         "event_slug": "",
         "event_id": "",
@@ -96,6 +111,8 @@ def load_config(path) -> dict:
     cfg = _merge(DEFAULTS, data)
     if "partners" in data:
         cfg["partners"] = data["partners"] or {}
+    if (data.get("rubric") or {}).get("criteria"):
+        cfg["rubric"]["criteria"] = data["rubric"]["criteria"]  # an event's own criteria replace the defaults
 
     ev = cfg["event"]
     for key in ("start", "deadline"):
@@ -116,12 +133,19 @@ def load_config(path) -> dict:
         ch["match"] = [m.lower() for m in (ch.get("match") or [key])]
         ch["data_hints"] = [h.lower() for h in (ch.get("data_hints") or [])]
         ch.setdefault("template", "")
+        if not isinstance(ch.get("brief_files") or [], list):
+            raise ConfigError(f"challenges.{key}.brief_files must be a list of paths in the template repo")
         brief = ch.get("brief") or ""
         if brief:
             bp = (base / brief).resolve()
             if not bp.exists():
                 raise ConfigError(f"challenges.{key}.brief file not found: {bp}")
             ch["brief_path"] = str(bp)
+
+    from .requirements import config_problems
+    problems = config_problems(cfg["challenges"])
+    if problems:
+        raise ConfigError(problems[0])
 
     for key, partner in cfg["partners"].items():
         for pat in partner.get("patterns", []):
@@ -139,13 +163,50 @@ def load_config(path) -> dict:
             raise ConfigError(f"extra_secret_patterns: invalid regex {entry['pattern']!r}: {e}") from e
         entry.setdefault("name", "Custom secret")
 
+    if not isinstance(cfg.get("sources"), list):
+        raise ConfigError("sources must be a list, e.g. [{type: github-prs}, {type: csv, path: alkemio.csv}]")
+    for i, src in enumerate(cfg["sources"]):
+        if not isinstance(src, dict) or src.get("type") not in ("alkemio", "github-prs", "csv", "junction"):
+            raise ConfigError(f"sources[{i}]: type must be alkemio, github-prs, csv or junction")
+        if src["type"] == "csv" and not src.get("path"):
+            raise ConfigError(f"sources[{i}]: a csv source needs a 'path'")
+        if src["type"] == "alkemio":
+            if not src.get("space"):
+                raise ConfigError(f"sources[{i}]: an alkemio source needs 'space' (the nameID in alkem.io/<space>)")
+            for key in ("challenges", "questions"):
+                if not isinstance(src.get(key) or {}, dict):
+                    raise ConfigError(f"sources[{i}]: '{key}' must be a mapping")
+            unknown = set(src.get("questions") or {}) - {"project", "members", "repo", "demo", "punchline",
+                                                         "description"}
+            if unknown:
+                raise ConfigError(f"sources[{i}]: unknown question role(s) {sorted(unknown)}; use project, members, "
+                                  "repo, demo, punchline or description")
+
+    fb = cfg["feedback"]
+    if fb.get("channel") not in ("chat", "email"):
+        raise ConfigError("feedback.channel must be chat or email")
+    if not isinstance(fb.get("max_points"), int) or not 1 <= fb["max_points"] <= 10:
+        raise ConfigError("feedback.max_points must be a number from 1 to 10")
+
+    rb = cfg["rubric"]
+    if rb.get("max_score") not in (5, 10):
+        raise ConfigError("rubric.max_score must be 5 or 10 (the scales the review prompt has anchors for)")
+
     rv = cfg["review"]
-    if rv["backend"] not in ("claude-cli", "anthropic", "offline"):
-        raise ConfigError("review.backend must be claude-cli, anthropic or offline")
+    if rv["backend"] not in BACKENDS:
+        raise ConfigError(f"review.backend must be one of {', '.join(BACKENDS)}")
     try:
         rv["workers"] = max(1, int(rv["workers"]))
     except (TypeError, ValueError) as e:
         raise ConfigError(f"review.workers must be a number, got {rv['workers']!r}") from e
+
+    from .branding import check as check_branding, resolve_paths
+    if not isinstance(cfg.get("branding"), dict):
+        raise ConfigError("branding must be a mapping, e.g. {primary: '#2C55A1', accent: '#E52983'}")
+    resolve_paths(cfg["branding"], base)
+    bad = [m for m in check_branding(cfg["branding"]) if m.startswith("branding.")]
+    if bad:
+        raise ConfigError(bad[0])
 
     cfg["paths"]["workdir"] = str((base / cfg["paths"]["workdir"]).resolve())
     cfg["paths"]["output"] = str((base / cfg["paths"]["output"]).resolve())

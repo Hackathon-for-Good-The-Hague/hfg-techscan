@@ -114,7 +114,54 @@ scan:
   # See config/examples/checks/ for examples.
   custom_checks_dir: ""                      # e.g. ./checks (relative to this config file)
 
+# ── Branding (optional) ──────────────────────────────────────────────────────
+# Colours, font and logos for the jury pack, scorecard header and challenge reports.
+# Leave out for the default look. Logo and font paths are relative to this file and embedded in the pack.
+# Preflight checks the contrast of each colour pair and warns about missing files.
+# branding:
+#   primary: "#2C55A1"            # cover, links, score badge, bars, headings
+#   accent: "#E52983"             # highlight borders, event name on the cover
+#   background: "#F9DAEA"         # page background (team cards stay white)
+#   tint: "#FDEEF5"               # table headers and chips
+#   highlight: "#FDEEF5"          # the "questions to ask" box
+#   cover_background: "#F9DAEA"   # default: primary
+#   cover_text: "#2C55A1"         # default: white
+#   cover_accent: "#E52983"       # default: accent
+#   font_family: "Figtree,'Segoe UI',Arial,sans-serif"
+#   font_files: {400: fonts/Regular.ttf, 700: fonts/Bold.ttf}
+#   logos: [logos/series.png, logos/org.png]
+#   footer: "My Hackathon · technical review by TechScan"
+#   no_em_dashes: true            # house style: replace em dashes in all output
+
 # ── Platform Integration (optional) ─────────────────────────────────────────
+# Where submissions come from. 'scan' without -s pulls from these (or run 'pull' to check the CSV first).
+# Earlier sources win for team name and links; rows pointing at the same GitHub repo become one team,
+# and a pull request link is resolved to the team's fork and branch.
+# sources:
+#   - type: alkemio             # the submission form in each challenge subspace of an Alkemio space
+#     space: my-space           # nameID from https://alkem.io/<space>
+#     callout: inzending        # nameID of the form callout in each challenge subspace
+#     label: Alkemio
+#     # Logs in with a space admin's browser cookie: set ALKEMIO_SESSION (see techscan/alkemio.py).
+#     # challenges: {subspace-nameID: challenge-key}   when subspace names differ from the keys below
+#     # questions: {repo: "Waar staat de code"}         when a form question is not recognised
+#   - type: csv                 # any export with project, repo, challenge columns
+#     path: export.csv
+#     label: Export
+#   - type: github-prs          # one PR per team into the challenge repos (defaults to each challenge's template)
+#     # repos: [{repo: "https://github.com/my-org/challenge-a", challenge: a}]
+#     # state: open             # open | all
+#     # exclude_authors: ["dependabot[bot]"]
+#   - type: junction            # uses the junction: block below
+#
+# Feedback for teams after the event (python -m techscan feedback): a private Alkemio message per team with
+# the review's strengths and points to improve. Drafts first; nothing is sent without your approval.
+# feedback:
+#   channel: chat               # chat | email (Alkemio's contact-by-e-mail)
+#   max_points: 3               # strengths and points to improve, each
+#   intro: "Hoi {team}, ..."    # {team}, {challenge}, {event}, {repo} are filled in; default per review.language
+#   closing: "..."
+
 # Junction (junctionapp.io)
 # junction:
 #   event_slug: "my-hackathon-2026"

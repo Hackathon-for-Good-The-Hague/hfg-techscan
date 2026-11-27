@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 
+from . import requirements as R
 from .facts import ENTRY_RE, notebook_to_text
 from .util import truncate
 
@@ -62,7 +63,8 @@ def _attr(value: str) -> str:
 
 
 def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: list, raw_secrets,
-               budget_chars: int, max_file_chars: int, include_content: bool = True) -> tuple:
+               budget_chars: int, max_file_chars: int, include_content: bool = True,
+               brief_chars: int = 14000) -> tuple:
     """Returns (user_text, pack_info). With include_content=False only the manifest is listed (deep mode)."""
     candidates = [f for f in inv.files
                   if f["status"] not in ("template", "scaffold", "boilerplate")
@@ -153,6 +155,7 @@ def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: 
         "bot_commits": facts["timeline"]["bot_commits"],
         "commits_per_day": facts["timeline"]["per_day"],
         "demo_link": facts["demo"].get("status"),
+        **({"challenge_requirements": R.pack_summary(facts["requirements"])} if facts.get("requirements") else {}),
         "automated_flags": [f"[{x['severity']}] {x['title']}" + (f": {truncate(x['detail'], 220)}" if x.get("detail") else "")
                             for x in flags],
     }
@@ -168,7 +171,7 @@ def build_pack(inv, facts: dict, sub: dict, challenge: dict, brief: str, flags: 
     ]
     user = "\n".join([
         "<challenge_brief>",
-        truncate(brief or "(No brief available. Judge against the project's own goals.)", 14000),
+        truncate(brief or "(No brief available. Judge against the project's own goals.)", brief_chars),
         "</challenge_brief>",
         "",
         "<submission>",
