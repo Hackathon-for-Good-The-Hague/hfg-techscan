@@ -9,7 +9,8 @@
     ],
     "techscan/intake.py": [
       "tests/test_sources.py",
-      "tests/test_alkemio.py"
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
     ],
     "techscan/config.py": [
       "tests/test_backends.py",
@@ -18,7 +19,8 @@
       "tests/test_requirements.py",
       "tests/test_rubric_language.py",
       "tests/test_sources.py",
-      "tests/test_alkemio.py"
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
     ],
     "techscan/gitops.py": [
       "tests/test_sources.py",
@@ -29,13 +31,15 @@
       "tests/test_branding.py",
       "tests/test_cli_report.py",
       "tests/test_rubric_language.py",
-      "tests/test_alkemio.py"
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
     ],
     "techscan/report.py": [
       "tests/test_cli_report.py",
       "tests/test_rubric_language.py",
       "tests/test_branding.py",
-      "tests/test_requirements.py"
+      "tests/test_requirements.py",
+      "tests/test_feedback.py"
     ],
     ".github/workflows/selftest.yml": [],
     "config/examples/full.yaml": [],
@@ -68,7 +72,8 @@
       "tests/test_alkemio.py"
     ],
     "techscan/branding.py": [
-      "tests/test_branding.py"
+      "tests/test_branding.py",
+      "tests/test_feedback.py"
     ],
     "techscan/observe.py": [
       "tests/test_branding.py"
@@ -83,11 +88,19 @@
       "tests/test_backends.py"
     ],
     "techscan/alkemio.py": [
-      "tests/test_alkemio.py"
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
     ],
     "tests/test_alkemio.py": [
-      "tests/test_alkemio.py"
+      "tests/test_alkemio.py",
+      "tests/test_feedback.py"
     ],
-    "README.md": []
+    "README.md": [],
+    "techscan/feedback.py": [
+      "tests/test_feedback.py"
+    ],
+    "tests/test_feedback.py": [
+      "tests/test_feedback.py"
+    ]
   }
 }

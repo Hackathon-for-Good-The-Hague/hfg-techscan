@@ -284,6 +284,14 @@ def cmd_challenge_report(cfg, args) -> int:
     return 0
 
 
+def cmd_feedback(cfg, args) -> int:
+    from .feedback import draft, send
+    if args.send:
+        return send(cfg, args.file or None, channel=args.channel, yes=args.yes)
+    draft(cfg, args.file or None)
+    return 0
+
+
 def cmd_report(cfg, args) -> int:
     from .report import write_outputs
     files = write_outputs(cfg, Path(cfg["paths"]["workdir"]), Path(cfg["paths"]["output"]), only=args.only)
@@ -340,6 +348,13 @@ def main(argv=None) -> int:
 
     p = with_config(sub.add_parser("challenge-report", help="generate scouting report for challenge owners"))
 
+    p = with_config(sub.add_parser("feedback", help="after the event: draft feedback per team, then send the approved "
+                                                    "messages via Alkemio (see techscan/feedback.py)"))
+    p.add_argument("--send", action="store_true", help="send the messages marked send: true (asks first)")
+    p.add_argument("--yes", action="store_true", help="with --send: do not ask for confirmation")
+    p.add_argument("--channel", choices=["chat", "email"], default="", help="Alkemio chat (default) or e-mail")
+    p.add_argument("--file", default="", help="drafts file (default: <output>/team-feedback.yaml)")
+
     p = with_config(sub.add_parser("web", help="launch the local web dashboard"))
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8080)
@@ -376,7 +391,7 @@ def main(argv=None) -> int:
         return 0
     dispatch = {"preflight": cmd_preflight, "discover": cmd_discover, "scan": cmd_scan, "report": cmd_report,
                  "pull": cmd_pull, "junction-pull": cmd_pull, "observe": cmd_observe, "narratives": cmd_narratives,
-                 "challenge-report": cmd_challenge_report}
+                 "challenge-report": cmd_challenge_report, "feedback": cmd_feedback}
     return dispatch[args.cmd](cfg, args)
 
 

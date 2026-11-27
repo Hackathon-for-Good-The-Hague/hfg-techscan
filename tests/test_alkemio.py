@@ -27,18 +27,18 @@ def answers(**values):
 
 RESPONSES = {
     "form-inkoop": [
-        {"id": "r1", "createdDate": "2026-12-10T12:00:00.000Z", "answers": answers(
+        {"id": "r1", "createdDate": "2026-12-10T12:00:00.000Z", "createdBy": {"id": "u-ann"}, "answers": answers(
             name="Soevereine Sloths", members="Ann Jansen (BZK)\nBob\nCy", one_line="Eisen op maat per SEAL-niveau.",
             problem="Inkopers krijgen honderd eisen.", works="Selectie werkt, TenderNed-koppeling is gesimuleerd.",
             repo="Onze repo: github.com/sloths/onegov3-inkooptafel (branch dev)", demo="https://sloths.example/demo.",
             assumptions="We nemen aan dat het DACC-register klopt.", learned="secret learned text")},
-        {"id": "r2", "createdDate": "2026-12-10T11:00:00.000Z", "answers": answers(
+        {"id": "r2", "createdDate": "2026-12-10T11:00:00.000Z", "createdBy": {"id": "u-bob"}, "answers": answers(
             name="Soevereine  sloths", members="Bob", repo="https://github.com/bob/old-attempt")},
-        {"id": "r3", "createdDate": "2026-12-10T13:30:00.000Z", "answers": answers(
+        {"id": "r3", "createdDate": "2026-12-10T13:30:00.000Z", "createdBy": {"id": "u-eve"}, "answers": answers(
             name="Eagles", repo="https://github.com/govtechnl/onegov3-inkooptafel/pull/7")},
     ],
     "form-algo": [
-        {"id": "r4", "createdDate": "2026-12-10T10:00:00.000Z", "answers": answers(
+        {"id": "r4", "createdDate": "2026-12-10T10:00:00.000Z", "createdBy": {"id": "u-owl"}, "answers": answers(
             name="Owls", members="Ann, Bob", repo="nog niet")},
     ],
 }
@@ -81,7 +81,14 @@ class FakeAlkemio(BaseHTTPRequestHandler):
         cookie = self.headers.get("Cookie") or ""
         FakeAlkemio.cookies.append(cookie)
         logged_in = cookie == "alkemio_session=good"
-        q, v = body["query"], body["variables"]
+        out = json.dumps(self.answer(body["query"], body["variables"], logged_in)).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+    def answer(self, q, v, logged_in):
         if "lookupByName" in q:
             data = {"me": {"user": {"id": "u", "profile": {"displayName": "Organiser"}} if logged_in else None},
                     "lookupByName": {"space": SPACE if v["space"] == "onegov-hackathon" else None}}
@@ -95,12 +102,7 @@ class FakeAlkemio(BaseHTTPRequestHandler):
                 "total": len(all_) if can else 0,
                 "pageInfo": {"hasNextPage": can and more, "endCursor": str(start + 2) if more else None},
                 "responses": page if can else []}}}}
-        out = json.dumps({"data": data}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(out)))
-        self.end_headers()
-        self.wfile.write(out)
+        return {"data": data}
 
 
 class AlkemioTest(unittest.TestCase):
@@ -122,6 +124,11 @@ class AlkemioTest(unittest.TestCase):
             """), encoding="utf-8")
         cls.cfg = load_config(cls.tmp / "c.yaml")
         cls.src = cls.cfg["sources"][0]
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
 
     def setUp(self):
         FakeAlkemio.admin, FakeAlkemio.cookies = True, []
@@ -145,6 +152,7 @@ class AlkemioTest(unittest.TestCase):
         self.assertIn("gesimuleerd of nog niet af?\nSelectie werkt", sloths["description"])
         self.assertIn("DACC-register", sloths["description"])
         self.assertNotIn("Ann", json.dumps(rows))  # member names are counted, never kept
+        self.assertNotIn("u-ann", json.dumps(rows))  # nor who sent the form
         self.assertNotIn("secret learned", sloths["description"])
         self.assertIn("2 Alkemio form responses", sloths["notes"])  # two members sent the form: newest wins
         self.assertTrue(sloths["platform_url"].endswith("/inkooptafel/collaboration/inzending"))

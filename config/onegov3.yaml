@@ -8,6 +8,12 @@
 #   12:00  python -m techscan scan -c config/onegov3.yaml        (all teams, full review)
 #   13:30  python -m techscan scan -c config/onegov3.yaml        (only changed teams)
 #   14:00  python -m techscan scan -c config/onegov3.yaml        (final: code frozen at 14:00, changed teams only)
+# After the event: feedback for teams (strengths and points to improve, never scores or flags), as a private
+# Alkemio message to whoever sent the team's form. Nothing goes out without your approval:
+#   python -m techscan feedback -c config/onegov3.yaml          drafts -> ../out-onegov3/team-feedback.yaml
+#   (read and edit every message, set send: true on the ones that may go out)
+#   python -m techscan feedback -c config/onegov3.yaml --send   asks before sending; 20 recipients an hour,
+#                                                                 run again an hour later for the rest
 # Before the event (set ALKEMIO_SESSION first, see sources: below):
 #   python -m techscan preflight -c config/onegov3.yaml --ping
 #   python -m techscan pull -c config/onegov3.yaml               (check the merged CSV)

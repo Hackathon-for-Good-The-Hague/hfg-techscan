@@ -62,13 +62,29 @@ STRUCTURE = """query TechScanAlkemioStructure($space: NameID!) {
 RESPONSES = """query TechScanAlkemioResponses($form: UUID!, $first: Int, $after: UUID) {
   lookup { calloutFormResponses(formID: $form, first: $first, after: $after) {
     canReadAll
-    all { total pageInfo { hasNextPage endCursor } responses { id createdDate answers { questionID prompt text } } }
+    all { total pageInfo { hasNextPage endCursor }
+      responses { id createdDate createdBy { id } answers { questionID prompt text } } }
   } }
 }"""
+
+SEND_CHAT = """mutation TechScanFeedbackChat($ids: [UUID!]!, $message: String!) {
+  sendDirectMessageToUsers(messageData: {receiverIDs: $ids, message: $message}) { receiverID status }
+}"""
+
+SEND_EMAIL = """mutation TechScanFeedbackEmail($ids: [UUID!]!, $message: String!) {
+  sendMessageToUsers(messageData: {receiverIds: $ids, message: $message})
+}"""
+
+MAX_MESSAGE = 2048  # Alkemio's limit for one message (LONG_TEXT_LENGTH)
+SEND_LIMIT = 20     # recipients per sender per rolling hour, for chat and e-mail together
 
 
 class AlkemioError(Exception):
     pass
+
+
+class LimitReached(AlkemioError):
+    """Alkemio's sending allowance (20 recipients an hour) is used up."""
 
 
 # ------------------------------------------------------------------ client
@@ -92,7 +108,8 @@ class AlkemioClient:
         return (f"set {self.env} to the '{self.cookie}' browser cookie of a space admin "
                 f"(how: see techscan/alkemio.py)")
 
-    def query(self, query: str, variables: dict) -> dict:
+    def query(self, query: str, variables: dict, strict: bool = False) -> dict:
+        """strict: any GraphQL error raises (for mutations, where a partial answer means it did not happen)."""
         body = json.dumps({"query": query, "variables": variables}).encode()
         headers = {"Content-Type": "application/json", "Accept": "application/json",
                    "User-Agent": "TechScan (hackathon review tool)"}
@@ -111,8 +128,12 @@ class AlkemioClient:
         except ValueError as e:
             raise AlkemioError("Alkemio API returned something that is not JSON") from e
         errors = [x.get("message", "") for x in data.get("errors") or []]
-        if errors and not data.get("data"):
-            raise AlkemioError("Alkemio API: " + "; ".join(errors)[:400])
+        codes = [str((x.get("extensions") or {}).get("code", "")) for x in data.get("errors") or []]
+        if errors and (strict or not data.get("data")):
+            text = "; ".join(errors)[:400]
+            if any("limit" in m.lower() for m in errors + codes):
+                raise LimitReached(f"Alkemio's sending limit is reached ({SEND_LIMIT} recipients an hour): {text}")
+            raise AlkemioError("Alkemio API: " + text)
         for msg in errors:
             log(f"  WARN Alkemio: {msg[:200]}")
         return data.get("data") or {}
@@ -289,6 +310,57 @@ def pull(cfg: dict, src: dict, client: AlkemioClient = None) -> list:
         log(f"  Alkemio {name}: {len(responses)} form response(s)")
         rows += [response_row(r, key, url, cfg, label, src.get("questions")) for r in responses]
     return dedupe(rows)
+
+
+def form_submitters(cfg: dict, src: dict, client: AlkemioClient = None) -> tuple:
+    """(logged-in name, [{challenge, team, repo, user_id}]) for every form response: who to send feedback to.
+    Only the Alkemio user ID is kept, never a name."""
+    client = client or AlkemioClient(src)
+    problem = client.problem()
+    if problem:
+        raise AlkemioError(problem)
+    who, data = _structure(client, src)
+    forms, _, _ = _forms(cfg, src, data)
+    out = []
+    for key, name, _, form in forms:
+        can_read_all, responses = _responses(client, form["id"])
+        if not can_read_all:
+            raise AlkemioError(f"logged in as {who}, but cannot read all responses in '{name}' (not a space admin)")
+        for resp in responses:
+            values = {}
+            for a in resp.get("answers") or []:
+                role = question_role(a.get("prompt", ""), src.get("questions"))
+                if role in ("project", "repo") and role not in values and (a.get("text") or "").strip():
+                    values[role] = a["text"].strip()
+            user_id = (resp.get("createdBy") or {}).get("id", "")
+            if user_id:
+                out.append({"challenge": key, "team": values.get("project", "").splitlines()[0] if values.get("project")
+                            else "", "repo": first_url(values.get("repo", ""), prefer_github=True), "user_id": user_id})
+    return who, out
+
+
+def send_message(client: AlkemioClient, user_ids: list, message: str, channel: str = "chat") -> dict:
+    """Send one private message to each user. Returns {user_id: SENT | BLOCKED_NO_CONSENT | FAILED}.
+    chat: Alkemio's 1:1 chat. email: Alkemio's 'contact by e-mail', for users who switched chat off.
+    Raises LimitReached when the hourly allowance is used up (then nothing was sent in that call)."""
+    if len(message) > MAX_MESSAGE:
+        raise AlkemioError(f"message is {len(message)} characters; Alkemio accepts at most {MAX_MESSAGE}")
+    if channel == "chat":
+        data = client.query(SEND_CHAT, {"ids": user_ids, "message": message}, strict=True)
+        results = data.get("sendDirectMessageToUsers") or []
+        results = results if isinstance(results, list) else [results]
+        got = {r.get("receiverID"): r.get("status", "FAILED") for r in results if r}
+        return {u: got.get(u, "FAILED") for u in user_ids}
+    out = {}
+    for u in user_ids:  # one call each: a single user without e-mail consent fails the whole call
+        try:
+            client.query(SEND_EMAIL, {"ids": [u], "message": message}, strict=True)
+            out[u] = "SENT"
+        except LimitReached:
+            raise
+        except AlkemioError as e:
+            out[u] = "BLOCKED_NO_CONSENT" if "not open" in str(e).lower() else "FAILED"
+    return out
 
 
 def check(cfg: dict, src: dict, client: AlkemioClient = None) -> tuple:

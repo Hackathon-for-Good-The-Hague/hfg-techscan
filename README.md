@@ -328,7 +328,8 @@ Submissions CSV          Challenge brief
 | `scan` | Full pipeline: clone, check, AI review, output |
 | `report` | Rebuild outputs from cached results |
 | `discover` | List repos from a GitHub org |
-| `junction-pull` | Pull submissions from Junction platform |
+| `pull` | Pull submissions from the configured sources (Alkemio, GitHub PRs, Junction, CSV) into one CSV |
+| `feedback` | After the event: draft feedback per team, then send the approved messages via Alkemio |
 | `observe` | Poll repos during the event, record timelines |
 | `narratives` | Generate building journey stories from timelines |
 | `challenge-report` | Scouting report for challenge partners |

@@ -71,6 +71,8 @@ DEFAULTS = {
     "branding": {},
     # where submissions come from, in priority order (see techscan/sources.py); empty = pass -s <csv>
     "sources": [],
+    # after the event: messages to teams via Alkemio (see techscan/feedback.py); channel chat|email
+    "feedback": {"channel": "chat", "max_points": 3, "intro": "", "closing": ""},
     "junction": {
         "event_slug": "",
         "event_id": "",
@@ -179,6 +181,12 @@ def load_config(path) -> dict:
             if unknown:
                 raise ConfigError(f"sources[{i}]: unknown question role(s) {sorted(unknown)}; use project, members, "
                                   "repo, demo, punchline or description")
+
+    fb = cfg["feedback"]
+    if fb.get("channel") not in ("chat", "email"):
+        raise ConfigError("feedback.channel must be chat or email")
+    if not isinstance(fb.get("max_points"), int) or not 1 <= fb["max_points"] <= 10:
+        raise ConfigError("feedback.max_points must be a number from 1 to 10")
 
     rb = cfg["rubric"]
     if rb.get("max_score") not in (5, 10):

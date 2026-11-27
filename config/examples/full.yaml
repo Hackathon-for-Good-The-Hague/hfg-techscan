@@ -154,6 +154,14 @@ scan:
 #     # exclude_authors: ["dependabot[bot]"]
 #   - type: junction            # uses the junction: block below
 #
+# Feedback for teams after the event (python -m techscan feedback): a private Alkemio message per team with
+# the review's strengths and points to improve. Drafts first; nothing is sent without your approval.
+# feedback:
+#   channel: chat               # chat | email (Alkemio's contact-by-e-mail)
+#   max_points: 3               # strengths and points to improve, each
+#   intro: "Hoi {team}, ..."    # {team}, {challenge}, {event}, {repo} are filled in; default per review.language
+#   closing: "..."
+
 # Junction (junctionapp.io)
 # junction:
 #   event_slug: "my-hackathon-2026"
