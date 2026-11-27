@@ -133,7 +133,7 @@ def cmd_preflight(cfg, args) -> int:
         log(("FAIL " if err else "OK   ") + ("Review engine answered" if not err else err))
         ok &= not err
     from .sources import source_problems
-    problems = source_problems(cfg)
+    problems = source_problems(cfg, ping=args.ping)
     for label, problem in problems:
         log(f"{'WARN ' if problem else 'OK   '} Source {label}" + (f": {problem}" if problem else ""))
     if not problems:

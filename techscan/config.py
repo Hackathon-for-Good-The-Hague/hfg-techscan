@@ -164,10 +164,21 @@ def load_config(path) -> dict:
     if not isinstance(cfg.get("sources"), list):
         raise ConfigError("sources must be a list, e.g. [{type: github-prs}, {type: csv, path: alkemio.csv}]")
     for i, src in enumerate(cfg["sources"]):
-        if not isinstance(src, dict) or src.get("type") not in ("github-prs", "csv", "junction"):
-            raise ConfigError(f"sources[{i}]: type must be github-prs, csv or junction")
+        if not isinstance(src, dict) or src.get("type") not in ("alkemio", "github-prs", "csv", "junction"):
+            raise ConfigError(f"sources[{i}]: type must be alkemio, github-prs, csv or junction")
         if src["type"] == "csv" and not src.get("path"):
             raise ConfigError(f"sources[{i}]: a csv source needs a 'path'")
+        if src["type"] == "alkemio":
+            if not src.get("space"):
+                raise ConfigError(f"sources[{i}]: an alkemio source needs 'space' (the nameID in alkem.io/<space>)")
+            for key in ("challenges", "questions"):
+                if not isinstance(src.get(key) or {}, dict):
+                    raise ConfigError(f"sources[{i}]: '{key}' must be a mapping")
+            unknown = set(src.get("questions") or {}) - {"project", "members", "repo", "demo", "punchline",
+                                                         "description"}
+            if unknown:
+                raise ConfigError(f"sources[{i}]: unknown question role(s) {sorted(unknown)}; use project, members, "
+                                  "repo, demo, punchline or description")
 
     rb = cfg["rubric"]
     if rb.get("max_score") not in (5, 10):

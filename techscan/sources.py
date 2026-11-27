@@ -2,9 +2,11 @@
 
 Configure under `sources:` (a list, read in order; earlier sources win for team name and links):
 
+  - type: alkemio         the submission form in each challenge subspace of an Alkemio space (`space:`,
+                          `callout:`); logs in with a space admin's browser cookie, see techscan/alkemio.py.
   - type: github-prs      open pull requests into the challenge repos (fork + one PR per team).
                           Repos default to each challenge's `template`; override with `repos:`.
-  - type: csv             any export (e.g. Alkemio) with project/repo/challenge columns. `path:`, `label:`.
+  - type: csv             any export with project/repo/challenge columns. `path:`, `label:`.
   - type: junction        the Junction tRPC export (uses the `junction:` block).
 
 Rows from different sources that point at the same GitHub repo are merged into one team. A pull
@@ -224,6 +226,14 @@ def pull_junction(cfg: dict, src: dict) -> list:
     return _rows_from_csv(raw, cfg, "Junction")
 
 
+def pull_alkemio(cfg: dict, src: dict) -> list:
+    from .alkemio import AlkemioError, pull
+    try:
+        return pull(cfg, src)
+    except AlkemioError as e:
+        raise SourceError(f"alkemio: {e}") from e
+
+
 # ------------------------------------------------------------------ merge
 
 def _join(a, b) -> str:
@@ -280,7 +290,7 @@ def write_rows(path: Path, rows: list) -> None:
             w.writerow({c: r.get(c, "") for c in COLUMNS})
 
 
-PULLERS = {"csv": pull_csv, "junction": pull_junction}
+PULLERS = {"alkemio": pull_alkemio, "csv": pull_csv, "junction": pull_junction}
 
 
 def pull_all(cfg: dict, out_path=None) -> Path:
@@ -301,7 +311,7 @@ def pull_all(cfg: dict, out_path=None) -> Path:
             rows = PULLERS[kind](cfg, src)
             label = rows[0]["platform"] if rows else (src.get("label") or kind)
         else:
-            raise SourceError(f"Unknown source type '{kind}' (use github-prs, csv or junction)")
+            raise SourceError(f"Unknown source type '{kind}' (use alkemio, github-prs, csv or junction)")
         resolve_pr_links(rows, gh, repo_challenges)
         log(f"  {len(rows)} row(s) from {label}")
         groups.append((label, rows))
@@ -312,12 +322,22 @@ def pull_all(cfg: dict, out_path=None) -> Path:
     return out
 
 
-def source_problems(cfg: dict) -> list:
-    """Readiness per source for preflight: [(label, problem_or_empty)]."""
+def source_problems(cfg: dict, ping: bool = False) -> list:
+    """Readiness per source for preflight: [(label, problem_or_empty)]. ping: also log in where that is
+    possible (Alkemio), which checks the cookie, the forms and admin access."""
     out = []
     for src in configured_sources(cfg):
         kind = src.get("type", "")
-        if kind == "github-prs":
+        if kind == "alkemio":
+            from .alkemio import AlkemioClient, check
+            label = f"alkemio {src.get('space', '')}"
+            if ping:
+                summary, problem = check(cfg, src)
+                out.append((label + (f" ({summary})" if summary else ""), problem))
+            else:
+                problem = AlkemioClient(src).problem()
+                out.append((label + ("" if problem else " (cookie set; --ping logs in)"), problem))
+        elif kind == "github-prs":
             repos = pr_repos(cfg, src)
             out.append((f"github-prs ({', '.join(repos) or 'no repos'})",
                         "" if repos else "no repos: set challenge templates or 'repos:'"))

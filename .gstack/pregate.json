@@ -4,10 +4,12 @@
   "dependencies": {
     "techscan/sources.py": [
       "tests/test_sources.py",
-      "tests/test_cli_report.py"
+      "tests/test_cli_report.py",
+      "tests/test_alkemio.py"
     ],
     "techscan/intake.py": [
-      "tests/test_sources.py"
+      "tests/test_sources.py",
+      "tests/test_alkemio.py"
     ],
     "techscan/config.py": [
       "tests/test_backends.py",
@@ -15,7 +17,8 @@
       "tests/test_cli_report.py",
       "tests/test_requirements.py",
       "tests/test_rubric_language.py",
-      "tests/test_sources.py"
+      "tests/test_sources.py",
+      "tests/test_alkemio.py"
     ],
     "techscan/gitops.py": [
       "tests/test_sources.py",
@@ -25,7 +28,8 @@
       "tests/test_backends.py",
       "tests/test_branding.py",
       "tests/test_cli_report.py",
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_alkemio.py"
     ],
     "techscan/report.py": [
       "tests/test_cli_report.py",
@@ -60,7 +64,8 @@
     "config/onegov3.yaml": [
       "tests/test_backends.py",
       "tests/test_requirements.py",
-      "tests/test_rubric_language.py"
+      "tests/test_rubric_language.py",
+      "tests/test_alkemio.py"
     ],
     "techscan/branding.py": [
       "tests/test_branding.py"
@@ -76,6 +81,13 @@
     ],
     "tests/test_backends.py": [
       "tests/test_backends.py"
-    ]
+    ],
+    "techscan/alkemio.py": [
+      "tests/test_alkemio.py"
+    ],
+    "tests/test_alkemio.py": [
+      "tests/test_alkemio.py"
+    ],
+    "README.md": []
   }
 }

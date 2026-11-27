@@ -8,7 +8,7 @@
 #   12:00  python -m techscan scan -c config/onegov3.yaml        (all teams, full review)
 #   13:30  python -m techscan scan -c config/onegov3.yaml        (only changed teams)
 #   14:00  python -m techscan scan -c config/onegov3.yaml        (final: code frozen at 14:00, changed teams only)
-# Before the event:
+# Before the event (set ALKEMIO_SESSION first, see sources: below):
 #   python -m techscan preflight -c config/onegov3.yaml --ping
 #   python -m techscan pull -c config/onegov3.yaml               (check the merged CSV)
 
@@ -56,15 +56,24 @@ branding:
   footer: "OneGov Hackathon Series · GovTechNL · technische review door TechScan (Hackathon OS)"
   no_em_dashes: true
 
-# The Alkemio entry is the submission; a PR into a starter repo is optional. Until the Alkemio source is set
-# up, only teams that opened a PR are found: teams working in their own repo are missed.
+# The Alkemio form ("Inzending" in each challenge subspace) is the submission; a PR into a starter repo is
+# optional. Alkemio comes first so its team names win when a team is found in both. A repo link or a pull
+# request link in the form is resolved to the team's repo and branch.
+#
+# Alkemio has no API keys: TechScan logs in with the browser session of a space admin (only admins can
+# read every form response). On the morning of each event day:
+#   1. log in at https://alkem.io, F12 -> Application -> Cookies -> https://alkem.io -> alkemio_session
+#   2. PowerShell:  $env:ALKEMIO_SESSION = "<value>"   (bash: export ALKEMIO_SESSION=...)
+#      Never put the value in a file in this repo: it gives full access to the Alkemio account.
+#   3. python -m techscan preflight -c config/onegov3.yaml --ping   (logs in, checks admin access per form)
+# Teams can only send the form once (withdraw and resend to change it), and each member can send one, so
+# the scan keeps the newest response per team name. The 12:00 scan only sees teams that already sent the
+# form: ask teams in the morning briefing to send it by 12:00 with at least team name and repository link.
 sources:
-  # FILL IN next week: the Alkemio adapter, or meanwhile an Alkemio export (columns: project, repo, challenge).
-  # A repo link or a pull request link in the Alkemio entry is resolved to the team's repo and branch.
-  # Alkemio comes first so its team names win when a team is found in both.
-  # - type: csv
-  #   path: ../alkemio-onegov3.csv
-  #   label: Alkemio
+  - type: alkemio
+    space: onegov-hackathon
+    callout: inzending
+    label: Alkemio
   - type: github-prs
     exclude_authors: ["dependabot[bot]"]
 

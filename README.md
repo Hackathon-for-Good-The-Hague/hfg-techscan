@@ -271,7 +271,7 @@ class LumaAdapter(BaseAdapter):
 
 **Adapters wanted:** MLH, Unstop, Devfolio, Taikai. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Existing adapters: Junction, DevPost, BuilderBase, Luma, HackerEarth, ETHGlobal, CSV (any platform).
+Existing adapters: Junction, Alkemio (submission forms), GitHub pull requests, DevPost, BuilderBase, Luma, HackerEarth, ETHGlobal, CSV (any platform).
 
 ### Add a deterministic check
 
